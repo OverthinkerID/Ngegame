@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, session, utilityProcess, type UtilityProcess } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -70,8 +71,14 @@ function startEmbeddedBackendIfPackaged(): void {
   const backendEntry = path.resolve(__dirname, '..', '..', 'backend', 'dist', 'src', 'server.js');
   const unpackedRoot = path.join(process.resourcesPath, 'app.asar.unpacked');
   const workerScript = path.join(unpackedRoot, 'apps', 'python-worker', 'main.py');
-  const userDbPath = path.join(app.getPath('userData'), 'ngegame.db');
-  const logDir = path.join(app.getPath('userData'), 'logs');
+  const userDataDir = app.getPath('userData');
+  const userDbPath = path.join(userDataDir, 'ngegame.db');
+  const templateDbPath = path.join(unpackedRoot, 'apps', 'backend', 'prisma', 'template.sqlite');
+  if (!fs.existsSync(userDbPath) && fs.existsSync(templateDbPath)) {
+    fs.mkdirSync(userDataDir, { recursive: true });
+    fs.copyFileSync(templateDbPath, userDbPath);
+  }
+  const logDir = path.join(userDataDir, 'logs');
   embeddedBackend = utilityProcess.fork(backendEntry, [], {
     env: {
       ...process.env,
