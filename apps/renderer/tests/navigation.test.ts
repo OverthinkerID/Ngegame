@@ -4,7 +4,7 @@ import { NAV_ITEMS } from '../src/data/mockData.ts';
 import type { PageId } from '../src/types/dashboard.ts';
 
 describe('@ngegame/renderer navigation', () => {
-  it('defines all 10 required dashboard pages without duplicates', () => {
+  it('defines all 11 required dashboard pages without duplicates', () => {
     const expectedPages: PageId[] = [
       'dashboard',
       'library',
@@ -13,18 +13,19 @@ describe('@ngegame/renderer navigation', () => {
       'adapters',
       'streaming',
       'voice',
-      'history',
       'analytics',
+      'history',
+      'system-monitor',
       'settings',
     ];
 
-    assert.equal(NAV_ITEMS.length, 10);
+    assert.equal(NAV_ITEMS.length, 11);
     const actualIds = NAV_ITEMS.map((item) => item.id);
     assert.deepEqual(actualIds, expectedPages);
-    assert.equal(new Set(actualIds).size, 10);
+    assert.equal(new Set(actualIds).size, 11);
   });
 
-  it('provides non-empty labels and descriptions for every page', () => {
+  it('provides non-empty Indonesian labels and descriptions for every page', () => {
     for (const item of NAV_ITEMS) {
       assert.ok(item.label.trim().length > 0);
       assert.ok(item.description.trim().length > 0);

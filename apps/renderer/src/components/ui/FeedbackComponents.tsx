@@ -104,6 +104,19 @@ export function LoadingState({ label = 'Memuat data sistem...' }: { label?: stri
   );
 }
 
+export function LoadingSkeleton({ rows = 3 }: { rows?: number }): React.JSX.Element {
+  return (
+    <div className="space-y-2.5" aria-busy="true" aria-label="Memuat konten">
+      {Array.from({ length: rows }).map((_, idx) => (
+        <div
+          key={idx}
+          className="h-12 animate-pulse rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
+        />
+      ))}
+    </div>
+  );
+}
+
 export function ErrorState({
   message,
   onRetry,

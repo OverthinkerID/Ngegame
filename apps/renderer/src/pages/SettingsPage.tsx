@@ -1,7 +1,8 @@
-import { History, Info, Moon, Palette, Sun } from 'lucide-react';
+import { History, Info, Moon, Palette, Shield, Sun } from 'lucide-react';
 import { useState } from 'react';
 import type { AppInfo, SystemLogEntry } from '@ngegame/shared';
 import { NgegameLogo } from '../components/ui/OverthinkerLogo.js';
+import { PageHeader } from '../components/ui/PageHeader.js';
 import { Panel } from '../components/ui/Panel.js';
 import { useTheme } from '../context/ThemeContext.js';
 import type { PageId, ThemeAccent } from '../types/dashboard.js';
@@ -13,33 +14,13 @@ interface SettingsPageProps {
   onNavigate?: (page: PageId) => void;
 }
 
-type SettingsTab = 'appearance' | 'history' | 'about';
+type SettingsTab = 'appearance' | 'integrations' | 'history' | 'about';
 
 const ACCENT_OPTIONS: { id: ThemeAccent; label: string; desc: string; swatch: string }[] = [
-  {
-    id: 'violet',
-    label: 'Studio Violet',
-    desc: 'Ungu futuristik (#8B5CF6)',
-    swatch: 'bg-[#8B5CF6]',
-  },
-  {
-    id: 'cyan',
-    label: 'Electric Sky',
-    desc: 'Biru modern (#38BDF8)',
-    swatch: 'bg-[#38BDF8]',
-  },
-  {
-    id: 'emerald',
-    label: 'Emerald Studio',
-    desc: 'Hijau presisi (#22C55E)',
-    swatch: 'bg-[#22C55E]',
-  },
-  {
-    id: 'overthinker',
-    label: 'Overthinker Olive',
-    desc: 'Olive khas Overthinker Studio',
-    swatch: 'bg-[#6F9C4E]',
-  },
+  { id: 'violet', label: 'Studio Violet', desc: 'Ungu futuristik (#8B5CF6)', swatch: 'bg-[#8B5CF6]' },
+  { id: 'cyan', label: 'Electric Sky', desc: 'Biru modern (#38BDF8)', swatch: 'bg-[#38BDF8]' },
+  { id: 'emerald', label: 'Emerald Studio', desc: 'Hijau presisi (#22C55E)', swatch: 'bg-[#22C55E]' },
+  { id: 'overthinker', label: 'Overthinker Olive', desc: 'Olive khas Overthinker', swatch: 'bg-[#6F9C4E]' },
 ];
 
 export function SettingsPage({
@@ -52,43 +33,38 @@ export function SettingsPage({
 
   return (
     <div className="space-y-6">
-      {/* Header Menu Pengaturan & Tab Internal */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">
-            Pengaturan Sistem
-          </h2>
-          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-            Konfigurasi mode gelap/terang, aksen warna, riwayat sesi, dan informasi aplikasi.
-          </p>
-        </div>
-
-        <div className="inline-flex rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1">
-          {[
-            { id: 'appearance' as SettingsTab, label: 'Tampilan', icon: Palette },
-            { id: 'history' as SettingsTab, label: 'Riwayat Sesi', icon: History },
-            { id: 'about' as SettingsTab, label: 'Tentang', icon: Info },
-          ].map((item) => {
-            const Icon = item.icon;
-            const active = tab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setTab(item.id)}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                  active
-                    ? 'bg-[var(--accent-primary-soft)] font-semibold text-[var(--text-primary)]'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <PageHeader
+        title="Pengaturan Aplikasi"
+        description="Konfigurasi tampilan gelap/terang, akses cepat modul AI/Suara/OBS, keamanan, riwayat sesi, dan tentang aplikasi."
+        actions={
+          <div className="inline-flex rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1">
+            {[
+              { id: 'appearance' as SettingsTab, label: 'Tampilan', icon: Palette },
+              { id: 'integrations' as SettingsTab, label: 'Layanan & Keamanan', icon: Shield },
+              { id: 'history' as SettingsTab, label: 'Riwayat Sesi', icon: History },
+              { id: 'about' as SettingsTab, label: 'Tentang', icon: Info },
+            ].map((item) => {
+              const Icon = item.icon;
+              const active = tab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setTab(item.id)}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    active
+                      ? 'bg-[var(--accent-primary-soft)] font-semibold text-[var(--text-primary)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        }
+      />
 
       {tab === 'appearance' && (
         <>
@@ -167,22 +143,34 @@ export function SettingsPage({
         </>
       )}
 
-      {tab === 'history' && (
-        <div className="space-y-4">
-          {onNavigate && (
-            <div className="flex justify-end">
+      {tab === 'integrations' && (
+        <Panel
+          title="Konfigurasi Layanan &amp; Keamanan"
+          subtitle="Buka halaman konfigurasi masing-masing subsistem untuk mengatur penyedia AI, VoxCPM 2.0, Steam, OBS, dan pengawasan."
+        >
+          <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { title: 'AI Engine (Ollama / OpenAI)', desc: 'Atur model lokal/cloud dan aturan izin L1–L3.', page: 'ai-control' as PageId },
+              { title: 'Studio Suara (VoxCPM 2.0)', desc: 'Atur profil suara Indonesia, kecepatan, dan cooldown.', page: 'voice' as PageId },
+              { title: 'Steam & Pustaka Game', desc: 'Pindai direktori Steam dan cek kompatibilitas.', page: 'library' as PageId },
+              { title: 'OBS & Kunci Siaran', desc: 'Atur koneksi WebSocket v5 & Credential Manager.', page: 'streaming' as PageId },
+              { title: 'Monitor Sistem & Integritas DB', desc: 'Cek kesehatan CPU, GPU, Worker, dan PRAGMA SQLite.', page: 'system-monitor' as PageId },
+            ].map((item) => (
               <button
+                key={item.title}
                 type="button"
-                onClick={() => onNavigate('history')}
-                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                onClick={() => onNavigate?.(item.page)}
+                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 text-left transition-colors hover:bg-[var(--surface-hover)]"
               >
-                Buka Tampilan Penuh Riwayat Sesi →
+                <div className="font-semibold text-[var(--text-primary)]">{item.title}</div>
+                <div className="mt-1 text-[11px] text-[var(--text-secondary)]">{item.desc}</div>
               </button>
-            </div>
-          )}
-          <SessionHistoryPage logs={logs} />
-        </div>
+            ))}
+          </div>
+        </Panel>
       )}
+
+      {tab === 'history' && <SessionHistoryPage logs={logs} />}
 
       {tab === 'about' && (
         <div className="space-y-6">
