@@ -1,9 +1,16 @@
 <div align="center">
-  <img src="apps/desktop/assets/icon.png" alt="Overthinker-Ngegame Logo" width="88" />
+  <img src="apps/desktop/assets/icon.svg" alt="Overthinker-Ngegame Logo" width="96" />
   <h1>Overthinker-Ngegame</h1>
   <p><strong>AI Gaming Command Center, Real-Time Game Vision &amp; Live Streaming Studio</strong></p>
   <p>
     <code>v0.1.0-prerelease</code> &bull; <code>Windows x64 &amp; macOS</code> &bull; <code>Electron + React + Node.js + Python</code>
+  </p>
+  <p>
+    <a href="#panduan-instalasi">Instalasi</a> &bull;
+    <a href="docs/USER_GUIDE.md">Panduan Pengguna</a> &bull;
+    <a href="docs/WINDOWS_GEMINI_CLI_GUIDE.md">Panduan Windows + Gemini CLI</a> &bull;
+    <a href="ARCHITECTURE.md">Arsitektur</a> &bull;
+    <a href="CHANGELOG.md">Changelog</a>
   </p>
 </div>
 
@@ -120,4 +127,23 @@ Detail pengembangan tersedia di [DEVELOPMENT.md](DEVELOPMENT.md) dan panduan pem
 - **v0.1.0 (Kandidat Saat Ini)**: Fase 1–12, Audit &amp; Hardening (12A–12B), Studio UI Redesign (12C–12D), dan Persiapan Rilis Windows NSIS x64 (12E).
 - **Berikutnya**: Pengujian instalasi penuh pada Windows nyata serta verifikasi paket macOS (`dmg` / `zip`).
 
-Lihat [CHANGELOG.md](CHANGELOG.md), [RELEASE.md](RELEASE.md), dan [CONTRIBUTING.md](CONTRIBUTING.md). Dikembangkan oleh **Overthinker Studio** (`OverthinkerID`).
+## Dokumentasi Lengkap
+
+| Dokumen | Deskripsi |
+| :--- | :--- |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Struktur monorepo, komunikasi IPC/REST/WebSocket, dan batasan keamanan. |
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Setup pengembangan lokal macOS &amp; Windows, environment, dan pengujian. |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Strategi branch, alur Pull Request, dan aturan keamanan Git. |
+| [RELEASE.md](RELEASE.md) | Versioning, build installer Windows NSIS, dan alur rilis tag `v*`. |
+| [CHANGELOG.md](CHANGELOG.md) | Catatan perubahan tiap versi rilis. |
+| [Panduan Pengguna](docs/USER_GUIDE.md) | Penjelasan 11 halaman UI Studio dan kontrol keamanan global. |
+| [Panduan Instalasi](docs/INSTALLATION_GUIDE.md) | Instalasi pengguna akhir Windows x64 (`SHA256`) dan mode pengembang. |
+| [Panduan Windows + Gemini CLI](docs/WINDOWS_GEMINI_CLI_GUIDE.md) | Alur lanjut pengembangan di Windows menggunakan Gemini CLI &amp; GitHub. |
+| [Membuat Game Adapter](docs/CREATING_GAME_ADAPTER.md) | Panduan membuat dan mendaftarkan `GameAdapterDefinition` baru. |
+| [Dokumentasi API](docs/API.md) | Daftar grup endpoint REST (`/api`) dan WebSocket (`/ws`). |
+| [Dokumentasi Database](docs/DATABASE.md) | Skema SQLite (Prisma), indeks, dan mekanisme backup/restore. |
+
+## Kontribusi &amp; Lisensi
+
+- Alur kerja branch (`main`, `develop`, `feature/*`) dan aturan Pull Request dijelaskan pada [CONTRIBUTING.md](CONTRIBUTING.md).
+- Dikembangkan oleh **Overthinker Studio** (`OverthinkerID`).

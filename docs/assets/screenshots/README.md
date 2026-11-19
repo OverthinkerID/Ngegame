@@ -1,4 +1,8 @@
-# Screenshots — Overthinker-Ngegame
+<div align="center">
+  <img src="../../../apps/desktop/assets/icon.svg" alt="Overthinker-Ngegame Logo" width="56" />
+  <h1>Screenshots — Overthinker-Ngegame</h1>
+  <p><a href="../../../README.md">&larr; Kembali ke README</a></p>
+</div>
 
 Letakkan screenshot asli aplikasi di direktori ini agar otomatis tampil di `README.md`:
 

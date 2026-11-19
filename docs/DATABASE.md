@@ -1,4 +1,8 @@
-# Dokumentasi Basis Data SQLite (Prisma) — Overthinker-Ngegame
+<div align="center">
+  <img src="../apps/desktop/assets/icon.svg" alt="Overthinker-Ngegame Logo" width="64" />
+  <h1>Dokumentasi Basis Data SQLite (Prisma) — Overthinker-Ngegame</h1>
+  <p><a href="../README.md">&larr; Kembali ke README</a> &bull; <a href="../ARCHITECTURE.md">Arsitektur</a> &bull; <a href="API.md">Dokumentasi API</a></p>
+</div>
 
 Skema sumber: `apps/backend/prisma/schema.prisma`
 

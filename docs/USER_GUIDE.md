@@ -1,4 +1,8 @@
-# Panduan Pengguna — Overthinker-Ngegame
+<div align="center">
+  <img src="../apps/desktop/assets/icon.svg" alt="Overthinker-Ngegame Logo" width="64" />
+  <h1>Panduan Pengguna — Overthinker-Ngegame</h1>
+  <p><a href="../README.md">&larr; Kembali ke README</a> &bull; <a href="INSTALLATION_GUIDE.md">Panduan Instalasi</a> &bull; <a href="CREATING_GAME_ADAPTER.md">Game Adapter</a></p>
+</div>
 
 Panduan ini menjelaskan seluruh menu pada antarmuka **Overthinker Premium AI Gaming Studio** (11 halaman sidebar, Dark/Light Mode, dan bilah kontrol keamanan global).
 

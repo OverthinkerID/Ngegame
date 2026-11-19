@@ -1,4 +1,8 @@
-# Panduan Instalasi — Overthinker-Ngegame
+<div align="center">
+  <img src="../apps/desktop/assets/icon.svg" alt="Overthinker-Ngegame Logo" width="64" />
+  <h1>Panduan Instalasi — Overthinker-Ngegame</h1>
+  <p><a href="../README.md">&larr; Kembali ke README</a> &bull; <a href="USER_GUIDE.md">Panduan Pengguna</a> &bull; <a href="WINDOWS_GEMINI_CLI_GUIDE.md">Windows + Gemini CLI</a></p>
+</div>
 
 Panduan ini mencakup instalasi untuk **pengguna akhir (Windows x64)** maupun **pengembang (Windows & macOS)**.
 

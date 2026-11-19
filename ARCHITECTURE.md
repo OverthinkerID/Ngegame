@@ -1,4 +1,8 @@
-# Arsitektur Sistem — Overthinker-Ngegame
+<div align="center">
+  <img src="apps/desktop/assets/icon.svg" alt="Overthinker-Ngegame Logo" width="64" />
+  <h1>Arsitektur Sistem — Overthinker-Ngegame</h1>
+  <p><a href="README.md">&larr; Kembali ke README</a> &bull; <a href="docs/API.md">Dokumentasi API</a> &bull; <a href="docs/DATABASE.md">Skema Database</a></p>
+</div>
 
 **Overthinker-Ngegame** menggunakan arsitektur monorepo modular berbasis TypeScript dengan pemisahan ketat antara shell desktop Electron, antarmuka React, backend Node.js, database SQLite/Prisma, dan worker Python.
 
