@@ -6,8 +6,9 @@ export type PageId =
   | 'adapters'
   | 'streaming'
   | 'voice'
-  | 'history'
   | 'analytics'
+  | 'history'
+  | 'system-monitor'
   | 'settings';
 
 export type ThemeMode = 'dark' | 'light';

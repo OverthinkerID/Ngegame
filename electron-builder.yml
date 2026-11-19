@@ -21,6 +21,11 @@ files:
   - packages/shared/dist/**/*
   - packages/shared/package.json
   - node_modules/**/*
+  - "!**/*.db*"
+  - "!**/.env*"
+  - "!**/backups/**"
+  - "!**/*.log"
+  - "!**/__pycache__/**"
 extraMetadata:
   main: apps/desktop/dist/main.js
 win:
@@ -28,7 +33,7 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: apps/desktop/assets/icon.png
+  icon: apps/desktop/assets/icon.ico
   artifactName: "${productName}-Setup-${version}-${arch}.${ext}"
 nsis:
   oneClick: false
@@ -36,8 +41,8 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Overthinker-Ngegame
-  installerIcon: apps/desktop/assets/icon.png
-  uninstallerIcon: apps/desktop/assets/icon.png
+  installerIcon: apps/desktop/assets/icon.ico
+  uninstallerIcon: apps/desktop/assets/icon.ico
 mac:
   target:
     - dmg

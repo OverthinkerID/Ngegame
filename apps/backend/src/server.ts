@@ -1,10 +1,22 @@
-import { loadEnvConfig } from './config/env.js';
+import { loadEnvConfig, validateEnvConfig } from './config/env.js';
 import { createBackendApp } from './app.js';
 import { disconnectDatabase, recordSystemLog } from './db/prisma.js';
 
 async function bootstrap(): Promise<void> {
   const config = loadEnvConfig();
-  const { server, wss, workerClient, logger } = createBackendApp(config);
+  const validation = validateEnvConfig(config);
+  const { server, wss, workerClient, visionService, controllerService, logger } =
+    createBackendApp(config);
+
+  for (const warn of validation.warnings) {
+    logger.warn('Environment warning', { detail: warn });
+  }
+  if (!validation.valid) {
+    for (const err of validation.errors) {
+      logger.error('Invalid environment configuration', { detail: err });
+    }
+    process.exit(1);
+  }
 
   workerClient.start();
 
@@ -13,11 +25,17 @@ async function bootstrap(): Promise<void> {
     void recordSystemLog('info', 'backend', 'Backend server started', {
       host: config.host,
       port: config.port,
+      nodeEnv: config.nodeEnv,
     });
   });
 
+  let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     logger.info(`Received ${signal}, shutting down gracefully...`);
+    await visionService.stopMonitor().catch(() => {});
+    await controllerService.releaseAll().catch(() => {});
     wss.close();
     server.close();
     await workerClient.stop();
