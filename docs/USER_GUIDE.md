@@ -1,10 +1,26 @@
-# Panduan Penggunaan Overthinker-Ngegame
+# Panduan Pengguna — Overthinker-Ngegame
 
-1. **Main Dashboard**: Pantau kesehatan Backend Node.js, SQLite (Prisma), dan Python Worker secara real-time.
-2. **Game Library**: Klik **Scan Steam Library** untuk mendeteksi game Steam lokal, memeriksa kompatibilitas, lalu klik **Launch** atau **Stop**.
-3. **Vision Monitor**: Pilih jendela game atau layar utama, lalu klik **Capture Once** atau **Start Live** untuk melihat preview, scene, HUD, dan motion score.
-4. **Game Adapters**: Pilih atau uji resolusi adapter (*Stardew Valley PoC*, 7 genre, atau *Universal Adapter*).
-5. **AI Control (Brain & Human Supervision)**: Atur provider (Ollama/OpenAI) dan tingkat izin (`L1 Auto Execute`, `L2 Approval Required`, `L3 Human Only`). Gunakan **Take Over Control** atau **Emergency Stop** kapan saja.
-6. **AI Voice Studio (VoxCPM 2.0)**: Hubungkan server VoxCPM 2.0 Bahasa Indonesia, atur gaya/kecepatan/volume/cooldown, dan uji suara narator.
-7. **Live Streaming (OBS & Multistream)**: Hubungkan OBS WebSocket (`ws://localhost:4455`), simpan stream key YouTube/Twitch secara aman di OS Credential Manager, lalu mulai test stream dalam mode *unlisted/private*.
-8. **Analytics & Settings**: Pantau CPU/RAM/GPU, aktifkan *Auto Throttling*, ekspor laporan CSV/JSON, serta atur tema warna Dark Gaming Control Center.
+Panduan ini menjelaskan seluruh menu pada antarmuka **Overthinker Premium AI Gaming Studio** (11 halaman sidebar, Dark/Light Mode, dan bilah kontrol keamanan global).
+
+## Kontrol Global (Topbar & Status Bar)
+
+- **Jeda AI / Takeover / Emergency Stop**: Tersedia di bilah atas pada setiap halaman untuk menjeda penalaran AI, mengambil alih kontrol penuh ke manusia, atau menghentikan seluruh input kontroler secara instan tanpa menutup game maupun OBS.
+- **Indikator Platform & OBS**: Menampilkan OS aktif (`Windows` / `macOS`) serta status koneksi OBS WebSocket.
+- **Notifikasi, Tema (Dark/Light), & Uji Worker**: Mengganti tema gelap/terang, memeriksa riwayat notifikasi, serta menguji respons Python Worker secara langsung.
+- **Status Bar Bawah**: Menampilkan status **Backend**, **Worker**, **SQLite**, **OBS**, serta telemetri **CPU & RAM** real-time.
+
+## Daftar Halaman Aplikasi
+
+| Menu Sidebar | Fungsi Utama |
+| :--- | :--- |
+| **Dasbor** | Ringkasan studio: telemetri CPU/RAM/GPU, status AI & latensi, status Vision & FPS, sesi game aktif, status OBS/YouTube/Twitch, linimasa aktivitas AI, dan log sistem terbaru. |
+| **Pustaka Game** | Memindai instalasi Steam lokal (`appmanifest_*.acf`), memeriksa kompatibilitas, serta meluncurkan atau menghentikan game dengan pencatatan sesi ke SQLite. |
+| **Kendali AI** | Mengatur penyedia AI (**Ollama Lokal** / **OpenAI Cloud**), memilih tingkat izin (**L1 Eksekusi Otomatis**, **L2 Wajib Persetujuan**, **L3 Khusus Manusia**), meninjau antrean persetujuan, menjalankan simulasi uji AI, dan melihat audit log pengawasan manusia. |
+| **Monitor Visi** | Memilih jendela game atau layar utama, menjalankan tangkapan layar tunggal atau pemantauan langsung (*live*), serta memantau scene, elemen HUD, OCR, dan skor pergerakan (*motion score*). |
+| **Adaptor Game** | Mengelola dan menguji resolusi adaptor game (adaptor **Stardew Valley**, 7 templat genre, dan **Universal Adapter**) beserta daftar aksi yang diizinkan (*allowlist*). |
+| **Studio Siaran** | Menghubungkan OBS Studio WebSocket v5 (`ws://localhost:4455`), melihat pratinjau adegan aktif, memulai/menghentikan siaran uji, serta menyimpan kunci siaran **YouTube Live** dan **Twitch** secara terenkripsi di Keychain / Credential Manager OS. |
+| **Studio Suara AI** | Mengonfigurasi server **VoxCPM 2.0** Bahasa Indonesia (gaya suara, kecepatan, volume, jeda/cooldown), menguji sintesis narator, dan memantau cadangan lokal. |
+| **Analitik** | Memantau metrik performa sesi, efisiensi AI, dan mengekspor laporan analitik ke format **CSV** atau **JSON**. |
+| **Riwayat Sesi** | Menelusuri riwayat sesi bermain dan catatan aktivitas yang tersimpan nyata di database SQLite. |
+| **Monitor Sistem** | Memantau penggunaan CPU, memori, perangkat GPU, kesehatan proses backend/worker, serta pengaturan *auto-throttling*. |
+| **Pengaturan** | Mengelola konfigurasi aplikasi, tema tampilan, kredensial penyedia AI cloud, serta backup, restore, dan pemeriksaan integritas database SQLite (`PRAGMA integrity_check`). |
