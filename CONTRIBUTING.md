@@ -1,4 +1,8 @@
-# Panduan Kontribusi — Overthinker-Ngegame
+<div align="center">
+  <img src="apps/desktop/assets/icon.svg" alt="Overthinker-Ngegame Logo" width="64" />
+  <h1>Panduan Kontribusi — Overthinker-Ngegame</h1>
+  <p><a href="README.md">&larr; Kembali ke README</a> &bull; <a href="DEVELOPMENT.md">Pengembangan Lokal</a> &bull; <a href="RELEASE.md">Panduan Rilis</a></p>
+</div>
 
 Dokumen ini menjelaskan alur kerja Git, standar kualitas kode, dan aturan keamanan sebelum mengirimkan perubahan ke repositori **Overthinker-Ngegame**.
 

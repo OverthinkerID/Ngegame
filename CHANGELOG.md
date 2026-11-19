@@ -1,4 +1,8 @@
-# Changelog — Overthinker-Ngegame
+<div align="center">
+  <img src="apps/desktop/assets/icon.svg" alt="Overthinker-Ngegame Logo" width="64" />
+  <h1>Changelog — Overthinker-Ngegame</h1>
+  <p><a href="README.md">&larr; Kembali ke README</a> &bull; <a href="RELEASE.md">Panduan Rilis</a></p>
+</div>
 
 Seluruh perubahan penting pada proyek **Overthinker-Ngegame** dicatat dalam berkas ini.
 

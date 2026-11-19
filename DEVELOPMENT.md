@@ -1,4 +1,8 @@
-# Panduan Pengembangan Lokal — Overthinker-Ngegame
+<div align="center">
+  <img src="apps/desktop/assets/icon.svg" alt="Overthinker-Ngegame Logo" width="64" />
+  <h1>Panduan Pengembangan Lokal — Overthinker-Ngegame</h1>
+  <p><a href="README.md">&larr; Kembali ke README</a> &bull; <a href="CONTRIBUTING.md">Panduan Kontribusi</a> &bull; <a href="docs/WINDOWS_GEMINI_CLI_GUIDE.md">Panduan Windows + Gemini CLI</a></p>
+</div>
 
 ## Prasyarat Sistem
 

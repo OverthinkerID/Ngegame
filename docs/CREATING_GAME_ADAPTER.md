@@ -1,4 +1,8 @@
-# Panduan Membuat Game Adapter Baru — Overthinker-Ngegame
+<div align="center">
+  <img src="../apps/desktop/assets/icon.svg" alt="Overthinker-Ngegame Logo" width="64" />
+  <h1>Panduan Membuat Game Adapter Baru — Overthinker-Ngegame</h1>
+  <p><a href="../README.md">&larr; Kembali ke README</a> &bull; <a href="../ARCHITECTURE.md">Arsitektur</a> &bull; <a href="API.md">Dokumentasi API</a></p>
+</div>
 
 Arsitektur **Game Adapter System** pada Overthinker-Ngegame bersifat *plugin-based* sehingga dukungan game baru dapat ditambahkan tanpa mengubah kode inti **AI Brain Engine**.
 
