@@ -1,0 +1,33 @@
+{
+  "name": "overthinker-ngegame",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Overthinker-Ngegame — Windows Desktop AI Gaming Streamer (Monorepo)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n backend,renderer,desktop -c cyan,magenta,green \"npm run dev -w @ngegame/backend\" \"npm run dev -w @ngegame/renderer\" \"npm run dev -w @ngegame/desktop\"",
+    "dev:backend": "npm run dev -w @ngegame/backend",
+    "dev:renderer": "npm run dev -w @ngegame/renderer",
+    "dev:desktop": "npm run dev -w @ngegame/desktop",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "build": "npm run build -w @ngegame/shared && npm run build -w @ngegame/backend && npm run build -w @ngegame/renderer && npm run build -w @ngegame/desktop",
+    "typecheck": "npm run typecheck -w @ngegame/shared && npm run typecheck -w @ngegame/backend && npm run typecheck -w @ngegame/renderer && npm run typecheck -w @ngegame/desktop",
+    "test": "npm run test -w @ngegame/shared && npm run test -w @ngegame/backend && npm run test -w @ngegame/renderer && npm run test:python",
+    "test:python": "python3 -m unittest discover -s apps/python-worker/tests -p \"test_*.py\" -v",
+    "db:generate": "npm run db:generate -w @ngegame/backend",
+    "db:push": "npm run db:push -w @ngegame/backend",
+    "db:migrate": "npm run db:migrate -w @ngegame/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-main: #0B0D12;
+  --bg-secondary: #11141B;
+  --bg-sidebar: #0E1016;
+  --bg-elevated: #171B24;
+  --surface-card: #151923;
+  --surface-hover: #1D2330;
+  --border-subtle: #252B38;
+  --accent-primary: #8B5CF6;
+  --accent-primary-soft: rgba(139, 92, 246, 0.14);
+  --accent-secondary: #38BDF8;
+  --status-success: #22C55E;
+  --status-warning: #F59E0B;
+  --status-danger: #EF4444;
+  --text-primary: #F5F7FA;
+  --text-secondary: #A1A8B5;
+  --text-muted: #697386;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-main: #F4F6FA;
+  --bg-secondary: #FFFFFF;
+  --bg-sidebar: #F8FAFC;
+  --bg-elevated: #FFFFFF;
+  --surface-card: #FFFFFF;
+  --surface-hover: #EEF2F7;
+  --border-subtle: #DCE2EC;
+  --accent-primary: #7C3AED;
+  --accent-primary-soft: rgba(124, 58, 237, 0.1);
+  --accent-secondary: #0284C7;
+  --status-success: #16A34A;
+  --status-warning: #D97706;
+  --status-danger: #DC2626;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Windows 11 / Electron custom titlebar drag support */
+.app-drag-region {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+.studio-card {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.studio-card:hover {
+  border-color: color-mix(in srgb, var(--border-subtle) 60%, var(--accent-primary) 40%);
+}
+
+.studio-input {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.studio-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* Custom sleek scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

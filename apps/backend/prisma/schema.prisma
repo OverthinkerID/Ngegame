@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model SystemLog {
+  id        Int      @id @default(autoincrement())
+  level     String
+  source    String
+  message   String
+  metadata  String?
+  createdAt DateTime @default(now())
+}
+
+model SessionRecord {
+  id        String    @id @default(cuid())
+  title     String
+  status    String    @default("initialized")
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+}
+
+model SteamGame {
+  appId               Int       @id
+  name                String
+  installDir          String
+  installPath         String
+  executablePath      String?
+  sizeOnDiskBytes     Int       @default(0)
+  compatibility       String    @default("unknown")
+  compatibilityReason String    @default("")
+  lastScannedAt       DateTime  @default(now())
+  lastLaunchedAt      DateTime?
+  updatedAt           DateTime  @updatedAt
+}
+
+model VisionCapture {
+  id                 Int      @id @default(autoincrement())
+  windowTitle        String
+  platform           String
+  width              Int
+  height             Int
+  sceneLabel         String
+  motionScore        Float    @default(0)
+  brightness         Float    @default(0)
+  processingMs       Int      @default(0)
+  samplingIntervalMs Int      @default(1000)
+  ocrText            String   @default("")
+  hudJson            String   @default("[]")
+  objectsJson        String   @default("[]")
+  eventsJson         String   @default("[]")
+  capabilitiesJson   String   @default("{}")
+  createdAt          DateTime @default(now())
+}
+
+model AIDecision {
+  id               Int      @id @default(autoincrement())
+  providerUsed     String
+  modelUsed        String
+  fallbackUsed     Boolean  @default(false)
+  genre            String
+  gameStateSummary String
+  strategyPlan     String
+  reasoning        String
+  confidence       Float    @default(0)
+  actionsJson      String   @default("[]")
+  rejectedJson     String   @default("[]")
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  estimatedCostUsd Float    @default(0)
+  latencyMs        Int      @default(0)
+  executionStatus  String   @default("planned_only")
+  createdAt        DateTime @default(now())
+}
+
+model ControllerActionLog {
+  id           Int      @id @default(autoincrement())
+  actionType   String
+  mappedInput  String
+  durationMs   Int      @default(0)
+  dryRun       Boolean  @default(true)
+  activeWindow String   @default("")
+  status       String
+  reason       String
+  createdAt    DateTime @default(now())
+}
+
+model SupervisionQueueItem {
+  id              Int      @id @default(autoincrement())
+  actionType      String
+  target          String
+  parametersJson  String   @default("{}")
+  durationMs      Int      @default(300)
+  confidence      Float    @default(0)
+  rationale       String   @default("")
+  permissionLevel String
+  status          String   @default("pending")
+  reviewedBy      String?
+  reviewNote      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SupervisionAuditLog {
+  id              Int      @id @default(autoincrement())
+  eventType       String
+  actor           String
+  permissionLevel String
+  controlOwner    String
+  details         String
+  createdAt       DateTime @default(now())
+}
+
+model VoiceSpeechLog {
+  id           Int      @id @default(autoincrement())
+  text         String
+  emotion      String
+  engineUsed   String
+  fallbackUsed Boolean  @default(false)
+  latencyMs    Int      @default(0)
+  status       String
+  reason       String
+  createdAt    DateTime @default(now())
+}
+
+model StreamSessionLog {
+  id            Int       @id @default(autoincrement())
+  platforms     String
+  visibility    String    @default("unlisted")
+  avgBitrate    Int       @default(0)
+  droppedFrames Int       @default(0)
+  status        String
+  startedAt     DateTime  @default(now())
+  endedAt       DateTime?
+}
+
+model ResourceSnapshot {
+  id               Int      @id @default(autoincrement())
+  cpuPercent       Float
+  ramPercent       Float
+  ramUsedGb        Float
+  ramTotalGb       Float
+  throttlingActive Boolean  @default(false)
+  createdAt        DateTime @default(now())
+}

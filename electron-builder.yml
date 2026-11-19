@@ -1,0 +1,46 @@
+appId: com.overthinker.ngegame
+productName: Overthinker-Ngegame
+copyright: Copyright © 2026 Overthinker Studio
+directories:
+  output: release
+  buildResources: apps/desktop/assets
+asar: true
+asarUnpack:
+  - apps/python-worker/**/*
+  - apps/backend/prisma/**/*
+files:
+  - apps/desktop/dist/**/*
+  - apps/desktop/dist-preload/**/*
+  - apps/desktop/assets/**/*
+  - apps/desktop/package.json
+  - apps/renderer/dist/**/*
+  - apps/backend/dist/**/*
+  - apps/backend/prisma/schema.prisma
+  - apps/backend/package.json
+  - apps/python-worker/**/*
+  - packages/shared/dist/**/*
+  - packages/shared/package.json
+  - node_modules/**/*
+extraMetadata:
+  main: apps/desktop/dist/main.js
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: apps/desktop/assets/icon.png
+  artifactName: "${productName}-Setup-${version}-${arch}.${ext}"
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Overthinker-Ngegame
+  installerIcon: apps/desktop/assets/icon.png
+  uninstallerIcon: apps/desktop/assets/icon.png
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.games
+  icon: apps/desktop/assets/icon.png
