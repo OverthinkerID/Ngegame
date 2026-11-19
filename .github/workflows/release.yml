@@ -16,16 +16,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
 
       - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -33,6 +33,9 @@ jobs:
         run: |
           npm ci
           npm install --no-save electron-builder
+
+      - name: Build shared package
+        run: npm run build -w @ngegame/shared
 
       - name: Generate Prisma Client
         run: npm run db:generate
