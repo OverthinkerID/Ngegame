@@ -1,9 +1,32 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { AppError, ErrorCode } from '@ngegame/shared';
+import { loadEnvConfig, validateEnvConfig } from '../config/env.js';
 import { BackupService } from '../services/system/backupService.js';
 
 export function createSystemRouter(backupService = new BackupService()): Router {
   const router = Router();
+
+  router.get('/integrity', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const integrity = await backupService.checkIntegrity();
+      res.json({ ok: integrity.ok, integrity });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/env-check', (_req: Request, res: Response) => {
+    const config = loadEnvConfig();
+    const validation = validateEnvConfig(config);
+    res.json({
+      ok: validation.valid,
+      nodeEnv: config.nodeEnv,
+      host: config.host,
+      port: config.port,
+      warnings: validation.warnings,
+      errors: validation.errors,
+    });
+  });
 
   router.get('/backups', async (_req: Request, res: Response, next: NextFunction) => {
     try {

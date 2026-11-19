@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
@@ -21,6 +22,12 @@ export interface BackendEnvConfig {
   pythonBin: string;
   pythonWorkerPath: string;
   pythonWorkerTimeoutMs: number;
+}
+
+export interface EnvValidationResult {
+  valid: boolean;
+  warnings: string[];
+  errors: string[];
 }
 
 function parseLogLevel(raw: string | undefined): LogLevel {
@@ -63,5 +70,26 @@ export function loadEnvConfig(): BackendEnvConfig {
     pythonBin: process.env.PYTHON_BIN ?? defaultPythonBin,
     pythonWorkerPath: process.env.PYTHON_WORKER_PATH ?? defaultWorkerPath,
     pythonWorkerTimeoutMs: parsePort(process.env.PYTHON_WORKER_TIMEOUT_MS, 5000),
+  };
+}
+
+export function validateEnvConfig(config: BackendEnvConfig): EnvValidationResult {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  if (!config.databaseUrl.startsWith('file:')) {
+    errors.push('DATABASE_URL harus menggunakan skema SQLite file:...');
+  }
+  if (config.port < 1024 && process.platform !== 'win32') {
+    warnings.push(`Port ${config.port} berada di rentang privileged (<1024).`);
+  }
+  if (!fs.existsSync(config.pythonWorkerPath)) {
+    warnings.push(`Berkas Python Worker tidak ditemukan di: ${config.pythonWorkerPath}`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    warnings,
+    errors,
   };
 }

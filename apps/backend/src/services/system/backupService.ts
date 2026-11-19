@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { AppError, ErrorCode } from '@ngegame/shared';
-import { recordSystemLog } from '../../db/prisma.js';
+import { getPrismaClient, recordSystemLog } from '../../db/prisma.js';
 
 export interface BackupEntry {
   filename: string;
@@ -9,15 +9,38 @@ export interface BackupEntry {
   createdAt: string;
 }
 
+function resolveDatabasePathFromEnv(): string {
+  const raw = process.env.DATABASE_URL ?? 'file:./dev.db';
+  if (raw.startsWith('file:')) {
+    const filePart = raw.slice(5);
+    if (path.isAbsolute(filePart)) {
+      return filePart;
+    }
+    return path.resolve(process.cwd(), 'prisma', filePart);
+  }
+  return path.resolve(process.cwd(), 'prisma', 'dev.db');
+}
+
 export class BackupService {
   private readonly dbPath: string;
   private readonly backupDir: string;
 
   constructor(dbPath?: string, backupDir?: string) {
-    this.dbPath =
-      dbPath ?? path.resolve(process.cwd(), 'prisma', 'dev.db');
+    this.dbPath = dbPath ?? resolveDatabasePathFromEnv();
     this.backupDir =
-      backupDir ?? path.resolve(process.cwd(), 'backups');
+      backupDir ?? path.join(path.dirname(this.dbPath), 'backups');
+  }
+
+  public async checkIntegrity(): Promise<{ ok: boolean; result: string }> {
+    const prisma = getPrismaClient();
+    const rows = await prisma.$queryRawUnsafe<{ integrity_check?: string }[]>(
+      'PRAGMA integrity_check;',
+    );
+    const result = rows[0]?.integrity_check ?? 'unknown';
+    return {
+      ok: result.toLowerCase() === 'ok',
+      result,
+    };
   }
 
   public async createBackup(): Promise<BackupEntry> {
@@ -68,6 +91,9 @@ export class BackupService {
 
   public async restoreBackup(filename: string): Promise<{ ok: boolean; restoredFrom: string }> {
     const safeName = path.basename(filename);
+    if (!safeName.endsWith('.db')) {
+      throw new AppError('Invalid backup filename', ErrorCode.VALIDATION_ERROR, 400);
+    }
     const src = path.join(this.backupDir, safeName);
     try {
       await fs.access(src);

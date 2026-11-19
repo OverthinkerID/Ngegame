@@ -27,7 +27,19 @@ export interface BackendAppContext {
   wss: WebSocketServer;
   workerClient: PythonWorkerClient;
   visionService: VisionService;
+  controllerService: ControllerService;
   logger: Logger;
+}
+
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (origin.startsWith('file://')) return true;
+  try {
+    const parsed = new URL(origin);
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
 }
 
 export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
@@ -42,8 +54,25 @@ export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
   );
 
   const app = express();
-  app.use(cors());
-  app.use(express.json());
+  app.disable('x-powered-by');
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  });
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(new Error(`Origin '${origin}' not allowed by CORS policy`));
+      },
+    }),
+  );
+  app.use(express.json({ limit: '2mb' }));
 
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: '/ws' });
@@ -122,7 +151,11 @@ export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
         );
       }
     });
+
+    ws.on('error', (err) => {
+      logger.warn('WebSocket client error', { error: err.message });
+    });
   });
 
-  return { app, server, wss, workerClient, visionService, logger };
+  return { app, server, wss, workerClient, visionService, controllerService, logger };
 }

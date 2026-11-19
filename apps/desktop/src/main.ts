@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, utilityProcess, type UtilityProcess } from 'electron';
+import { app, BrowserWindow, ipcMain, session, utilityProcess, type UtilityProcess } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -53,15 +53,29 @@ const IS_DEV = !app.isPackaged;
 let mainWindow: BrowserWindow | null = null;
 let embeddedBackend: UtilityProcess | null = null;
 
+function clampLimit(raw: unknown, fallback = 15, max = 200): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return fallback;
+  return Math.min(Math.max(Math.trunc(raw), 1), max);
+}
+
+function assertPositiveInt(raw: unknown, label: string): number {
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw <= 0) {
+    throw new Error(`Parameter IPC tidak valid: ${label}`);
+  }
+  return raw;
+}
+
 function startEmbeddedBackendIfPackaged(): void {
   if (IS_DEV || embeddedBackend) return;
   const backendEntry = path.resolve(__dirname, '..', '..', 'backend', 'dist', 'src', 'server.js');
   const userDbPath = path.join(app.getPath('userData'), 'ngegame.db');
+  const logDir = path.join(app.getPath('userData'), 'logs');
   embeddedBackend = utilityProcess.fork(backendEntry, [], {
     env: {
       ...process.env,
       NODE_ENV: 'production',
       DATABASE_URL: `file:${userDbPath}`,
+      NGEGAME_LOG_DIR: logDir,
     },
   });
 }
@@ -95,7 +109,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.BACKEND_LOGS,
     async (_event, limit = 10): Promise<SystemLogEntry[]> => {
-      const safeLimit = typeof limit === 'number' ? limit : 10;
+      const safeLimit = clampLimit(limit, 10);
       const data = await fetchBackendJson<{ logs?: SystemLogEntry[] }>(
         `/api/logs?limit=${safeLimit}`,
       );
@@ -127,7 +141,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.STEAM_LAUNCH,
     async (_event, appId: number): Promise<SteamLaunchResult> => {
-      return fetchBackendJson<SteamLaunchResult>(`/api/steam/games/${appId}/launch`, {
+      const validAppId = assertPositiveInt(appId, 'appId');
+      return fetchBackendJson<SteamLaunchResult>(`/api/steam/games/${validAppId}/launch`, {
         method: 'POST',
       });
     },
@@ -136,7 +151,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.STEAM_STOP,
     async (_event, appId: number): Promise<SteamStopResult> => {
-      return fetchBackendJson<SteamStopResult>(`/api/steam/games/${appId}/stop`, {
+      const validAppId = assertPositiveInt(appId, 'appId');
+      return fetchBackendJson<SteamStopResult>(`/api/steam/games/${validAppId}/stop`, {
         method: 'POST',
       });
     },
@@ -604,6 +620,14 @@ async function createMainWindow(): Promise<void> {
     },
   });
 
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const allowed = url.startsWith(RENDERER_DEV_URL) || url.startsWith('file://');
+    if (!allowed) {
+      event.preventDefault();
+    }
+  });
+
   if (IS_DEV) {
     await mainWindow.loadURL(RENDERER_DEV_URL);
   } else {
@@ -617,6 +641,9 @@ async function createMainWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
+  });
   startEmbeddedBackendIfPackaged();
   registerIpcHandlers();
   await createMainWindow();
