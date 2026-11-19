@@ -68,6 +68,8 @@ function assertPositiveInt(raw: unknown, label: string): number {
 function startEmbeddedBackendIfPackaged(): void {
   if (IS_DEV || embeddedBackend) return;
   const backendEntry = path.resolve(__dirname, '..', '..', 'backend', 'dist', 'src', 'server.js');
+  const unpackedRoot = path.join(process.resourcesPath, 'app.asar.unpacked');
+  const workerScript = path.join(unpackedRoot, 'apps', 'python-worker', 'main.py');
   const userDbPath = path.join(app.getPath('userData'), 'ngegame.db');
   const logDir = path.join(app.getPath('userData'), 'logs');
   embeddedBackend = utilityProcess.fork(backendEntry, [], {
@@ -75,6 +77,7 @@ function startEmbeddedBackendIfPackaged(): void {
       ...process.env,
       NODE_ENV: 'production',
       DATABASE_URL: `file:${userDbPath}`,
+      PYTHON_WORKER_PATH: workerScript,
       NGEGAME_LOG_DIR: logDir,
     },
   });

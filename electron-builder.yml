@@ -21,6 +21,11 @@ files:
   - packages/shared/dist/**/*
   - packages/shared/package.json
   - node_modules/**/*
+  - "!**/*.db*"
+  - "!**/.env*"
+  - "!**/backups/**"
+  - "!**/*.log"
+  - "!**/__pycache__/**"
 extraMetadata:
   main: apps/desktop/dist/main.js
 win:
