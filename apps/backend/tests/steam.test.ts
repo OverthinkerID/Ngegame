@@ -90,7 +90,7 @@ describe('Steam Integration', () => {
       assert.equal(stardew.compatibility, 'verified');
       assert.ok(stardew.executablePath !== null);
     } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
+      await fs.rm(tmpDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   });
 });

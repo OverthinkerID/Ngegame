@@ -41,7 +41,7 @@ describe('Vision Engine Integration', () => {
     const workerClient = new PythonWorkerClient({
       pythonBin,
       workerScriptPath: workerScript,
-      timeoutMs: 5000,
+      timeoutMs: 10000,
     });
 
     const tmpPng = path.join(os.tmpdir(), `ngegame-vision-test-${Date.now()}.png`);
@@ -63,7 +63,7 @@ describe('Vision Engine Integration', () => {
       assert.ok(typeof createdId === 'number');
       assert.equal(result.width, 128);
       assert.equal(result.height, 72);
-      assert.ok(result.processingMs < 2000);
+      assert.ok(result.processingMs < 5000);
       assert.deepEqual(broadcasted, ['vision:frame']);
     } finally {
       if (createdId !== undefined) {

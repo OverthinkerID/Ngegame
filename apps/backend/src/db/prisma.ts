@@ -5,6 +5,7 @@ import { Logger } from '../utils/logger.js';
 const logger = new Logger('database');
 
 let prismaInstance: PrismaClient | null = null;
+let sqliteConfigured = false;
 
 export function getPrismaClient(): PrismaClient {
   if (!process.env.DATABASE_URL) {
@@ -12,8 +13,22 @@ export function getPrismaClient(): PrismaClient {
   }
   if (!prismaInstance) {
     prismaInstance = new PrismaClient();
+    sqliteConfigured = false;
+  }
+  if (!sqliteConfigured) {
+    sqliteConfigured = true;
+    void configureSqlitePragmas(prismaInstance);
   }
   return prismaInstance;
+}
+
+async function configureSqlitePragmas(prisma: PrismaClient): Promise<void> {
+  try {
+    await prisma.$queryRawUnsafe('PRAGMA busy_timeout = 5000;');
+    await prisma.$queryRawUnsafe('PRAGMA journal_mode = WAL;');
+  } catch {
+    // Abaikan jika bukan SQLite atau sudah terkunci sementara
+  }
 }
 
 export async function checkDatabaseHealth(): Promise<ComponentStatus> {
@@ -69,5 +84,6 @@ export async function disconnectDatabase(): Promise<void> {
   if (prismaInstance) {
     await prismaInstance.$disconnect();
     prismaInstance = null;
+    sqliteConfigured = false;
   }
 }
