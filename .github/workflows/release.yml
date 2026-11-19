@@ -52,6 +52,11 @@ jobs:
           npm run build
           npm test
 
+      - name: Prepare Clean SQLite Template DB
+        env:
+          DATABASE_URL: "file:./template.sqlite"
+        run: npm run db:push
+
       - name: Package Windows NSIS Installer
         run: npx electron-builder --win --x64 --publish never
 

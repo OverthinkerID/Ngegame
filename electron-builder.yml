@@ -8,6 +8,8 @@ asar: true
 asarUnpack:
   - apps/python-worker/**/*
   - apps/backend/prisma/**/*
+  - node_modules/.prisma/**/*
+  - node_modules/@prisma/**/*
 files:
   - apps/desktop/dist/**/*
   - apps/desktop/dist-preload/**/*
@@ -16,11 +18,18 @@ files:
   - apps/renderer/dist/**/*
   - apps/backend/dist/**/*
   - apps/backend/prisma/schema.prisma
+  - apps/backend/prisma/template.sqlite
   - apps/backend/package.json
   - apps/python-worker/**/*
   - packages/shared/dist/**/*
   - packages/shared/package.json
   - node_modules/**/*
+  - "!node_modules/@ngegame/**"
+  - from: packages/shared
+    to: node_modules/@ngegame/shared
+    filter:
+      - dist/**/*
+      - package.json
   - "!**/*.db*"
   - "!**/.env*"
   - "!**/backups/**"
