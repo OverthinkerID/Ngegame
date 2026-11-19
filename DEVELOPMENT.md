@@ -2,41 +2,41 @@
 
 ## Prasyarat Sistem
 
-- **Node.js** `>= 20.x` dan **npm** `>= 10.x`
-- **Python** `>= 3.9` (`python3` di macOS/Linux, `python` di Windows)
+- **Node.js** `>= 20.x` (disarankan **22 LTS**) dan **npm** `>= 10.x`
+- **Python** `>= 3.11` (`python3` di macOS/Linux, `python` di Windows)
 - **Git**
 
-## Instalasi & Menjalankan di macOS
+## Setup Awal
 
+### macOS / Linux
 ```bash
-npm install
-# Jika binary Electron belum terpasang pada npm v12+:
+npm ci
+# Jika binary Electron belum terpasang otomatis:
 node node_modules/electron/install.js
 
+npm run build -w @ngegame/shared
 npm run db:generate
 DATABASE_URL="file:./dev.db" npm run db:push
-npm run build -w @ngegame/shared
 npm run dev
 ```
 
-## Instalasi & Menjalankan di Windows (PowerShell)
-
+### Windows (PowerShell)
 ```powershell
-npm install
+npm ci
+npm run build -w @ngegame/shared
 npm run db:generate
 $env:DATABASE_URL="file:./dev.db"; npm run db:push
-npm run build -w @ngegame/shared
 npm run dev
 ```
 
-## Referensi Environment Variables (`.env`)
+## Konfigurasi Environment Lokal
 
-Buat file `.env` secara lokal (jangan pernah di-commit ke Git):
+Buat berkas konfigurasi environment lokal di root proyek (pastikan tidak pernah di-commit ke Git):
 
-```env
+```ini
 NODE_ENV=development
 LOG_LEVEL=info
-BACKEND_HOST=127.0.0.1
+BACKEND_HOST=localhost
 BACKEND_PORT=47800
 RENDERER_PORT=5173
 DATABASE_URL="file:./dev.db"
@@ -49,15 +49,21 @@ OBS_WEBSOCKET_URL=ws://localhost:4455
 
 ## Layanan Eksternal Opsional
 
-- **Ollama**: `http://localhost:11434` untuk penalaran AI lokal.
-- **VoxCPM 2.0**: `http://localhost:8000` untuk sintesis suara Bahasa Indonesia.
-- **OBS Studio (WebSocket v5)**: `ws://localhost:4455` untuk kontrol adegan dan multistream.
-- **Python Vision Dependencies**: Pasang `apps/python-worker/requirements.txt` (`mss`, `opencv-python`, `pytesseract`, `Pillow`) untuk akselerasi tangkapan layar dan OCR.
+| Layanan | Alamat Default | Kegunaan |
+| :--- | :--- | :--- |
+| **Ollama** | `http://localhost:11434` | Penalaran AI lokal tanpa biaya API cloud. |
+| **VoxCPM 2.0** | `http://localhost:8000` | Sintesis suara narator Bahasa Indonesia. |
+| **OBS Studio** | `ws://localhost:4455` | Kendali adegan dan siaran melalui OBS WebSocket v5. |
+| **Python Vision** | `apps/python-worker/requirements.txt` | Akselerasi `mss`, OpenCV, Tesseract OCR, dan Pillow. |
 
-## Perintah Verifikasi
+## Pemeriksaan Tipe, Build, & Pengujian
+
+Selalu jalankan rangkaian verifikasi berikut sebelum melakukan commit:
 
 ```bash
 npm run typecheck
 npm run build
 npm test
 ```
+
+> **Catatan CI:** Pengujian backend (`@ngegame/backend`) dijalankan dengan `--test-concurrency=1` dan SQLite `WAL` + `PRAGMA busy_timeout = 5000` agar konsisten di Ubuntu dan Windows.

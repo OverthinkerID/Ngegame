@@ -1,28 +1,35 @@
 # Arsitektur Sistem — Overthinker-Ngegame
 
-**Overthinker-Ngegame** menggunakan arsitektur monorepo modular berbasis TypeScript dengan pemisahan ketat antara antarmuka desktop, layanan backend, worker Python, dan paket kontrak tipe bersama.
+**Overthinker-Ngegame** menggunakan arsitektur monorepo modular berbasis TypeScript dengan pemisahan ketat antara shell desktop Electron, antarmuka React, backend Node.js, database SQLite/Prisma, dan worker Python.
 
 ## Struktur Monorepo
 
-```text
-Overthinker-Ngegame/
-├── apps/
-│   ├── backend/          # Express REST API, WebSocket (/ws), Prisma SQLite, Security & Services
-│   ├── desktop/          # Electron Main Process, Preload IPC bridge, embedded backend bootstrap
-│   ├── python-worker/    # Subprocess Python (NDJSON stdin/stdout) untuk Vision & Game Controller
-│   └── renderer/         # React + Vite + Tailwind CSS v4 (Dark/Light Studio UI)
-├── packages/
-│   └── shared/           # Kontrak IPC, tipe TypeScript, dan skema error bersama
-├── docs/                 # Panduan pengguna, instalasi, dan pembuatan adaptor game
-└── .github/workflows/    # GitHub Actions CI & Release workflows
-```
+| Workspace / Direktori | Paket | Tanggung Jawab Utama |
+| :--- | :--- | :--- |
+| `apps/desktop` | `@ngegame/desktop` | Main process Electron, preload `contextBridge`, penjaga navigasi/izin, IPC handler tervalidasi, dan bootstrap backend tertanam (`utilityProcess.fork`). |
+| `apps/renderer` | `@ngegame/renderer` | Antarmuka React 19 + Vite + Tailwind CSS v4 (11 halaman Studio UI, Dark/Light Mode, kontrol keamanan global). |
+| `apps/backend` | `@ngegame/backend` | Express REST API, WebSocket (`/ws`), Prisma ORM + SQLite (`WAL` mode), logging teredaksi, backup/restore, serta orkestrasi layanan Steam, Vision, AI, Voice, dan OBS. |
+| `apps/python-worker` | `apps/python-worker` | Subprocess Python terisolasi via protokol **NDJSON** (`stdin`/`stdout`) untuk tangkapan layar lintas platform, OpenCV/OCR, dan eksekusi kontroler game ber-allowlist. |
+| `packages/shared` | `@ngegame/shared` | Kontrak tipe TypeScript, definisi adapter game, dan skema error bersama. |
+| `docs` | — | Dokumentasi API ([API.md](docs/API.md)), skema database ([DATABASE.md](docs/DATABASE.md)), panduan pengguna, instalasi, dan adaptor. |
 
 ## Alur Komunikasi Antar Proses
 
-1. **Renderer (`@ngegame/renderer`)**: Berkomunikasi melalui `window.ngegameAPI` (`contextBridge` di `preload.ts`) ketika berjalan di Electron, atau melalui HTTP/WebSocket lokal saat mode browser dev.
-2. **Electron Main (`@ngegame/desktop`)**: Mendaftarkan handler IPC (`ipcMain.handle`) dan meneruskannya ke backend `http://localhost:47800`. Pada build produksi (`app.isPackaged`), Electron otomatis menjalankan backend tertanam melalui `utilityProcess.fork`.
-3. **Backend (`@ngegame/backend`)**:
-   - Menyediakan endpoint REST (`/api/health`, `/api/steam/*`, `/api/vision/*`, `/api/ai/*`, `/api/controller/*`, `/api/adapters/*`, `/api/supervision/*`, `/api/voice/*`, `/api/streaming/*`, `/api/analytics/*`, `/api/system/*`) dan WebSocket (`/ws`).
-   - Menyimpan state operasional dan audit log ke **SQLite** via **Prisma**.
-   - Menyimpan rahasia stream key secara aman di **Windows Credential Manager** / **macOS Keychain** (dengan cadangan terenkripsi AES-256-GCM) melalui `StreamCredentialStore`.
-4. **Python Worker (`apps/python-worker`)**: Berjalan terisolasi dengan protokol **NDJSON** (`stdin`/`stdout`), menangani tangkapan layar lintas platform (`mss` / `screencapture` fallback), analisis OpenCV/OCR, serta eksekusi kontroler game yang dibatasi allowlist dan durasi aman.
+```text
+[React Renderer] <--- contextBridge (window.ngegameAPI) ---> [Electron Main Process]
+       |                                                               |
+       +------------------ REST & WebSocket (/ws) ---------------------+
+                                                                       |
+                                                                       v
+                                                        [Node.js Backend (:47800)]
+                                                          ├── Prisma / SQLite (WAL)
+                                                          ├── OS Keychain / Credential Manager
+                                                          └── NDJSON IPC ---> [Python Worker]
+```
+
+## Batasan Keamanan & Stabilitas
+
+- **Electron Sandbox & Navigation Guards**: `setWindowOpenHandler` menolak jendela eksternal tak dikenal, `will-navigate` membatasi navigasi, `setPermissionRequestHandler` memblokir izin perangkat yang tidak diperlukan, dan payload IPC divalidasi.
+- **Backend Isolation**: CORS dibatasi hanya untuk `localhost`, loopback, dan `file://`, ukuran body JSON dibatasi (`2 MB`), serta header keamanan HTTP diterapkan pada seluruh respons.
+- **Credential Storage**: Kunci siaran YouTube Live dan Twitch disimpan melalui **Windows Credential Manager** / **macOS Keychain** (dengan fallback terenkripsi AES-256-GCM) via `StreamCredentialStore`.
+- **Graceful Shutdown**: Saat aplikasi ditutup, backend menghentikan monitor visi (`visionService.stopMonitor()`) dan melepaskan seluruh input kontroler (`controllerService.releaseAll()`).
