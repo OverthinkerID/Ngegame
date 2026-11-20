@@ -19,6 +19,7 @@ import {
 import { ThemeProvider } from './context/ThemeContext.js';
 import { AIControlPage } from './pages/AIControlPage.js';
 import { AnalyticsPage } from './pages/AnalyticsPage.js';
+import { GameAdaptationStudioPage } from './pages/GameAdaptationStudioPage.js';
 import { GameAdaptersPage } from './pages/GameAdaptersPage.js';
 import { GameLibraryPage } from './pages/GameLibraryPage.js';
 import { LiveStreamingPage } from './pages/LiveStreamingPage.js';
@@ -194,6 +195,8 @@ function DashboardShell(): React.JSX.Element {
         return <VisionMonitorPage />;
       case 'adapters':
         return <GameAdaptersPage />;
+      case 'adaptation-studio':
+        return <GameAdaptationStudioPage onNotify={showNotify} />;
       case 'streaming':
         return <LiveStreamingPage onNotify={showNotify} />;
       case 'voice':

@@ -1,5 +1,6 @@
 from collections import deque
 from datetime import datetime, timezone
+import time
 from typing import Any, Deque, Dict, Optional
 
 from worker.controller.input_driver import InputDriver, detect_controller_backend
@@ -19,6 +20,7 @@ class ControllerManager:
         self.driver = InputDriver()
         self.queue: Deque[Dict[str, Any]] = deque(maxlen=50)
         self.last_action_at: Optional[str] = None
+        self.last_action_ts_by_type: Dict[str, float] = {}
 
     def get_status(self) -> Dict[str, Any]:
         return {
@@ -37,8 +39,8 @@ class ControllerManager:
         windows = list_visible_windows()
         if not windows:
             return None
-        first = windows[0]
-        return f"{first.get('owner', '')}: {first.get('title', '')}".strip(": ")
+        focused = next((w for w in windows if w.get("focused")), windows[0])
+        return f"{focused.get('owner', '')}: {focused.get('title', '')}".strip(": ")
 
     def pause(self) -> Dict[str, Any]:
         self.paused = True
@@ -78,6 +80,12 @@ class ControllerManager:
         except (TypeError, ValueError):
             duration_ms = 300
 
+        cooldown_ms = 0
+        try:
+            cooldown_ms = max(0, int(payload.get("cooldownMs", 0)))
+        except (TypeError, ValueError):
+            cooldown_ms = 0
+
         dry_run = bool(payload.get("dryRun", True))
         self.dry_run = dry_run
         expected_game = payload.get("expectedGameTitle")
@@ -110,6 +118,22 @@ class ControllerManager:
                 "executedAt": now_iso,
             }
 
+        now_mono = time.monotonic()
+        if cooldown_ms > 0 and action_type in self.last_action_ts_by_type:
+            elapsed_ms = (now_mono - self.last_action_ts_by_type[action_type]) * 1000.0
+            if elapsed_ms < cooldown_ms:
+                return {
+                    "ok": False,
+                    "actionType": action_type,
+                    "mappedInput": "none",
+                    "durationMs": 0,
+                    "dryRun": dry_run,
+                    "activeWindow": active_window,
+                    "status": "blocked",
+                    "reason": f"Cooldown aktif ({int(cooldown_ms - elapsed_ms)}ms tersisa).",
+                    "executedAt": now_iso,
+                }
+
         try:
             kind, token, label = map_action_to_input(action_type, parameters)
         except ValueError as exc:
@@ -127,6 +151,7 @@ class ControllerManager:
 
         if not dry_run and isinstance(expected_game, str) and expected_game.strip():
             if expected_game.lower() not in active_window.lower():
+                self.driver.release_all()
                 return {
                     "ok": False,
                     "actionType": action_type,
@@ -140,11 +165,24 @@ class ControllerManager:
                 }
 
         self.queue.append({"actionType": action_type, "token": token, "at": now_iso})
-        if kind == "key":
-            self.driver.execute_key_hold(token, duration_ms, dry_run=dry_run)
-        self.queue.pop()
+        try:
+            if kind == "key":
+                self.driver.execute_key_hold(token, duration_ms, dry_run=dry_run)
+            elif kind == "multi_key":
+                self.driver.execute_multi_key_hold(token.split("+"), duration_ms, dry_run=dry_run)
+            elif kind == "mouse":
+                raw_x = parameters.get("x")
+                raw_y = parameters.get("y")
+                x = int(raw_x) if isinstance(raw_x, (int, float)) else None
+                y = int(raw_y) if isinstance(raw_y, (int, float)) else None
+                self.driver.execute_mouse_action(token, x, y, dry_run=dry_run)
+        finally:
+            if self.queue:
+                self.queue.pop()
+            self.driver.release_all()
 
         self.last_action_at = now_iso
+        self.last_action_ts_by_type[action_type] = time.monotonic()
         return {
             "ok": True,
             "actionType": action_type,
