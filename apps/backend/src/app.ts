@@ -10,6 +10,7 @@ import { createAIRouter } from './routes/aiRoutes.js';
 import { createAnalyticsRouter } from './routes/analyticsRoutes.js';
 import { createControllerRouter } from './routes/controllerRoutes.js';
 import { createHealthRouter } from './routes/healthRoutes.js';
+import { createRuntimeRouter } from './routes/runtimeRoutes.js';
 import { createSteamRouter } from './routes/steamRoutes.js';
 import { createStreamingRouter } from './routes/streamingRoutes.js';
 import { createSupervisionRouter } from './routes/supervisionRoutes.js';
@@ -22,6 +23,7 @@ import { GameProfileManager } from './services/adaptation/gameProfileManager.js'
 import { PipelineDiagnosticsService } from './services/adaptation/pipelineDiagnostics.js';
 import { AIBrainService } from './services/ai/aiBrainService.js';
 import { ControllerService } from './services/controller/controllerService.js';
+import { RuntimeOrchestratorService } from './services/runtime/runtimeOrchestrator.js';
 import { SteamManager } from './services/steam/steamManager.js';
 import { SupervisionService } from './services/supervision/supervisionService.js';
 import { VisionService } from './services/vision/visionService.js';
@@ -35,6 +37,7 @@ export interface BackendAppContext {
   workerClient: PythonWorkerClient;
   visionService: VisionService;
   controllerService: ControllerService;
+  runtimeOrchestrator: RuntimeOrchestratorService;
   logger: Logger;
 }
 
@@ -136,8 +139,20 @@ export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
     controllerService,
     aiBrainService,
   );
+  const runtimeOrchestrator = new RuntimeOrchestratorService(
+    profileManager,
+    steamManager,
+    visionService,
+    aiBrainService,
+    controllerService,
+    supervisionService,
+    gameBrainService,
+    broadcastWs,
+    new Logger('runtime-orchestrator', config.logLevel),
+  );
 
   app.use('/api', createHealthRouter(workerClient, '0.1.0'));
+  app.use('/api/runtime', createRuntimeRouter(runtimeOrchestrator));
   app.use('/api/steam', createSteamRouter(steamManager));
   app.use('/api/vision', createVisionRouter(visionService));
   app.use('/api/ai', createAIRouter());
@@ -197,5 +212,14 @@ export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
     });
   });
 
-  return { app, server, wss, workerClient, visionService, controllerService, logger };
+  return {
+    app,
+    server,
+    wss,
+    workerClient,
+    visionService,
+    controllerService,
+    runtimeOrchestrator,
+    logger,
+  };
 }

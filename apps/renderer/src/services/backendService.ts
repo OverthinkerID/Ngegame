@@ -866,4 +866,46 @@ export const backendService = {
     }
     return requestJson<{ currentLevel: StardewCapabilityLevel; levels: Record<number, { title: string; capabilities: string[]; smapiNote?: string }> }>(`/api/adaptation/stardew/capabilities?level=${level}`);
   },
+
+  async getRuntimeStatus(): Promise<{
+    phase: string;
+    activeSession: {
+      id: string;
+      title: string;
+      status: string;
+      totalActions: number;
+      totalDecisions: number;
+    } | null;
+    activeGameId: string | null;
+    activeGameName: string | null;
+    currentTask: string | null;
+    gameState: string;
+    aiProviderHealth: AIProviderHealth | null;
+    controllerStatus: ControllerState | null;
+    supervisionState: SupervisionState | null;
+    lastError: string | null;
+    updatedAt: string;
+  }> {
+    return requestJson('/api/runtime/status');
+  },
+
+  async startRuntimeSession(req: { gameId: string; windowTitle?: string; goal?: string }) {
+    return requestJson('/api/runtime/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+  },
+
+  async stopRuntimeSession(reason?: string) {
+    return requestJson('/api/runtime/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  async recoverRuntimeSessions() {
+    return requestJson('/api/runtime/recover', { method: 'POST' });
+  },
 };
