@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, utilityProcess, type UtilityProcess } from 'electron';
+import { app, BrowserWindow, ipcMain, session, shell, utilityProcess, type UtilityProcess } from 'electron';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
@@ -216,6 +216,13 @@ function registerIpcHandlers(): void {
       nodeVersion: process.versions.node,
       backendUrl: getBackendUrl(),
     };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.APP_OPEN_EXTERNAL, async (_event, rawUrl: unknown): Promise<void> => {
+    if (typeof rawUrl !== 'string' || !rawUrl.startsWith('https://')) {
+      throw new Error('URL eksternal harus menggunakan protokol https://');
+    }
+    await shell.openExternal(rawUrl);
   });
 
   ipcMain.handle(IPC_CHANNELS.BACKEND_HEALTH, async (): Promise<SystemHealthResponse> => {

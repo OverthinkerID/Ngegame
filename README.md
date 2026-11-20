@@ -1,11 +1,20 @@
 <div align="center">
-  <img src="apps/desktop/assets/icon.svg" alt="Overthinker-Ngegame Logo" width="96" />
-  <h1>Overthinker-Ngegame</h1>
+  <img src="apps/desktop/assets/icon.svg" alt="Ngegame Logo" width="96" />
+  <h1>Ngegame (Overthinker-Ngegame)</h1>
   <p><strong>AI Gaming Command Center, Real-Time Game Vision &amp; Live Streaming Studio</strong></p>
   <p>
-    <code>v0.1.0-prerelease</code> &bull; <code>Windows x64 &amp; macOS</code> &bull; <code>Electron + React + Node.js + Python</code>
+    <code>v0.1.0-prerelease</code> &bull;
+    <code>Windows x64 &amp; macOS</code> &bull;
+    <code>Electron</code> &bull;
+    <code>React</code> &bull;
+    <code>TypeScript</code> &bull;
+    <code>Node.js</code> &bull;
+    <code>Python</code> &bull;
+    <code>SQLite</code> &bull;
+    <code>Prisma</code>
   </p>
   <p>
+    <a href="site/index.html">Landing Page</a> &bull;
     <a href="#panduan-instalasi">Instalasi</a> &bull;
     <a href="docs/USER_GUIDE.md">Panduan Pengguna</a> &bull;
     <a href="docs/WINDOWS_GEMINI_CLI_GUIDE.md">Panduan Windows + Gemini CLI</a> &bull;

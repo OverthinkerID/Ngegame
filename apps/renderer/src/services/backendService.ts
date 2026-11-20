@@ -64,6 +64,14 @@ export const backendService = {
     return null;
   },
 
+  async openExternalUrl(url: string): Promise<void> {
+    if (window.ngegameAPI) {
+      await window.ngegameAPI.openExternalUrl(url);
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  },
+
   async getHealth(): Promise<SystemHealthResponse> {
     if (window.ngegameAPI) {
       return window.ngegameAPI.getBackendHealth();

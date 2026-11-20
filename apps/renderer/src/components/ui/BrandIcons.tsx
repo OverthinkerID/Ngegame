@@ -3,52 +3,38 @@ interface BrandIconProps {
 }
 
 /**
- * Logo resmi OBS Studio dengan cincin adaptif agar tetap terlihat jelas pada tema gelap maupun terang.
+ * Logo resmi OBS Studio (Simple Icons) dengan warna adaptif terhadap tema gelap dan terang.
  */
 export function ObsLogo({ className = 'h-5 w-5' }: BrandIconProps): React.JSX.Element {
   return (
-    <svg viewBox="0 0 64 64" fill="none" className={className} aria-label="OBS Studio">
-      <circle cx="32" cy="32" r="30" fill="#1E232E" stroke="#64748B" strokeWidth="2.5" />
-      <path
-        d="M32 10C22.4 10 14.7 17.3 13.7 26.6C16.8 23.4 21.4 22.1 25.9 23.6C23.1 19.6 24.7 13.6 32 10Z"
-        fill="#F8FAFC"
-      />
-      <path
-        d="M12.9 43C17.7 51.3 27.9 54.6 36.4 50.8C32.1 49.7 28.7 46.4 27.7 41.8C25.6 46.2 19.6 47.8 12.9 43Z"
-        fill="#F8FAFC"
-      />
-      <path
-        d="M51.1 43C55.9 34.7 53.6 24.2 46 18.8C47.2 23.1 46.1 27.7 42.6 30.8C47.5 30.4 51.9 34.9 51.1 43Z"
-        fill="#F8FAFC"
-      />
-      <circle cx="32" cy="32" r="5.5" fill="#F8FAFC" />
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-label="OBS Studio"
+    >
+      <path d="M12 24C5.383 24 0 18.617 0 12S5.383 0 12 0s12 5.383 12 12-5.383 12-12 12m0-22.891C5.995 1.109 1.11 5.995 1.11 12S5.995 22.89 12 22.89 22.89 18.005 22.89 12 18.005 1.109 12 1.109M6.182 5.99c.352-1.698 1.503-3.229 3.05-3.996-.269.273-.595.483-.844.78-1.02 1.1-1.48 2.692-1.199 4.156.355 2.235 2.455 4.06 4.732 4.028 1.765.079 3.485-.937 4.348-2.468 1.848.063 3.645 1.017 4.7 2.548.54.799.962 1.736.991 2.711-.342-1.295-1.202-2.446-2.375-3.095a4.9 4.9 0 0 0-3.772-.425c-1.56.448-2.849 1.723-3.293 3.293-.377 1.25-.216 2.628.377 3.772-.825 1.429-2.315 2.449-3.932 2.756-1.244.261-2.551.059-3.709-.464 1.036.302 2.161.355 3.191-.011a4.91 4.91 0 0 0 3.024-2.935c.556-1.49.345-3.261-.591-4.54-.7-1.007-1.803-1.717-3.002-1.969-.38-.068-.764-.098-1.148-.134-.611-1.231-.834-2.66-.528-3.996z" />
     </svg>
   );
 }
 
 /**
- * Logo resmi Steam dengan kontras adaptif untuk tema gelap dan terang.
+ * Logo resmi Steam (Simple Icons) dengan latar putih di dalam agar kontras di tema gelap maupun terang.
  */
 export function SteamLogo({ className = 'h-5 w-5' }: BrandIconProps): React.JSX.Element {
   return (
-    <svg viewBox="0 0 64 64" fill="none" className={className} aria-label="Steam">
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-label="Steam">
       <defs>
-        <linearGradient id="steamGrad" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#1B2838" />
+        <linearGradient id="steamBrandGrad" x1="12" y1="0" x2="12" y2="24" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#171D25" />
           <stop offset="100%" stopColor="#1A9FFF" />
         </linearGradient>
       </defs>
-      <circle cx="32" cy="32" r="30" fill="url(#steamGrad)" stroke="#475569" strokeWidth="2" />
-      <circle cx="42" cy="22" r="7.5" stroke="#FFFFFF" strokeWidth="3.5" />
-      <circle cx="42" cy="22" r="3" fill="#FFFFFF" />
+      <circle cx="12" cy="12" r="10.5" fill="#FFFFFF" />
       <path
-        d="M11 38.5L23.5 43.8C26.5 45.1 30 43.7 31.3 40.7C32.6 37.7 31.2 34.2 28.2 32.9L16 27.8"
-        stroke="#FFFFFF"
-        strokeWidth="4.5"
-        strokeLinecap="round"
+        fill="url(#steamBrandGrad)"
+        d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658a3.4 3.4 0 0 1 1.912-.59q.094.001.188.006l2.861-4.142V8.91a4.53 4.53 0 0 1 4.524-4.524c2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911l.004.159a3.39 3.39 0 0 1-3.39 3.396a3.41 3.41 0 0 1-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0M7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25a2.551 2.551 0 0 0 3.337-3.324a2.547 2.547 0 0 0-3.255-1.413l1.523.63a1.878 1.878 0 0 1-1.445 3.467zm11.415-9.303a3.02 3.02 0 0 0-3.015-3.015a3.015 3.015 0 1 0 3.015 3.015m-5.273-.005a2.264 2.264 0 1 1 4.531 0a2.267 2.267 0 0 1-2.266 2.265a2.264 2.264 0 0 1-2.265-2.265"
       />
-      <path d="M27.5 34.5L36.5 25.5" stroke="#FFFFFF" strokeWidth="5.5" strokeLinecap="round" />
-      <circle cx="26" cy="38.5" r="4.5" fill="#1B2838" stroke="#FFFFFF" strokeWidth="2.5" />
     </svg>
   );
 }

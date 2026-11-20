@@ -3,6 +3,7 @@ import type { NgegameBridgeAPI } from '@ngegame/shared';
 
 const api: NgegameBridgeAPI = {
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
+  openExternalUrl: (url: string) => ipcRenderer.invoke('app:open-external', url),
   getBackendHealth: () => ipcRenderer.invoke('backend:health'),
   getRecentLogs: (limit = 10) => ipcRenderer.invoke('backend:logs', limit),
   pingPythonWorker: () => ipcRenderer.invoke('worker:ping'),

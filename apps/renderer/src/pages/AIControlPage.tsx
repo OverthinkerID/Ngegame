@@ -3,12 +3,14 @@ import {
   Bot,
   Check,
   Cpu,
+  ExternalLink,
   Hand,
   OctagonAlert,
   Pause,
   Play,
   RefreshCw,
   RotateCcw,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   X,
@@ -30,6 +32,7 @@ import { Panel } from '../components/ui/Panel.js';
 import { StatCard } from '../components/ui/StatCard.js';
 import { StatusBadge } from '../components/ui/StatusBadge.js';
 import { backendService } from '../services/backendService.js';
+import { GUIDE_URLS, parseFriendlyError } from '../utils/guideHelper.js';
 
 const GENRE_OPTIONS: GameGenreTemplate[] = [
   'Universal',
@@ -42,7 +45,17 @@ const GENRE_OPTIONS: GameGenreTemplate[] = [
   'Platformer',
 ];
 
-export function AIControlPage(): React.JSX.Element {
+interface AIControlPageProps {
+  platform?: string;
+  onNotify?: (
+    message: string,
+    type?: 'info' | 'success' | 'error',
+    guideUrl?: string,
+    guideLabel?: string,
+  ) => void;
+}
+
+export function AIControlPage({ platform, onNotify }: AIControlPageProps): React.JSX.Element {
   const [config, setConfig] = useState<AIBrainConfig | null>(null);
   const [providerHealth, setProviderHealth] = useState<AIProviderHealth | null>(null);
   const [latestDecision, setLatestDecision] = useState<AIBrainDecisionResult | null>(null);
@@ -74,7 +87,8 @@ export function AIControlPage(): React.JSX.Element {
         setLatestDecision(aiHist[0] ?? null);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memuat status AI & Pengawasan.');
+      const friendly = parseFriendlyError(err, 'Gagal memuat status AI & Pengawasan.');
+      setError(friendly.message);
     }
   }, [latestDecision]);
 
@@ -124,7 +138,9 @@ export function AIControlPage(): React.JSX.Element {
       }
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menjalankan AI reasoning.');
+      const friendly = parseFriendlyError(err, 'Gagal menjalankan AI reasoning.');
+      setError(friendly.message);
+      onNotify?.(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
     } finally {
       setLoading(false);
     }
@@ -185,7 +201,44 @@ export function AIControlPage(): React.JSX.Element {
         />
       </section>
 
-      {error && <ErrorState message={error} onRetry={() => void loadAll()} />}
+      {error && (
+        <ErrorState
+          message={error}
+          guideUrl={GUIDE_URLS.ai}
+          guideLabel="Panduan AI"
+          onRetry={() => void loadAll()}
+        />
+      )}
+
+      {(platform === 'darwin' || !platform) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-xs">
+          <div className="flex min-w-0 flex-1 items-start gap-2.5">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            <div>
+              <div className="font-semibold text-[var(--text-primary)]">
+                Izin Sistem macOS Diperlukan untuk Kendali AI &amp; Visi
+              </div>
+              <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+                Agar fungsi tangkapan layar dan pengiriman input game berjalan sempurna di macOS, aktifkan izin{' '}
+                <strong>Screen Recording</strong>, <strong>Accessibility</strong>, dan{' '}
+                <strong>Input Monitoring</strong> untuk <strong>Ngegame</strong> di{' '}
+                <em>System Settings &rarr; Privacy &amp; Security</em>.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onNotify?.('Membuka panduan izin macOS di browser.', 'info');
+              void backendService.openExternalUrl(GUIDE_URLS.macos);
+            }}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-[11px] font-semibold text-amber-500 hover:bg-amber-500/25"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Panduan Izin macOS
+          </button>
+        </div>
+      )}
 
       <Panel
         title="Pengawasan Manusia &amp; Pengambilalihan Kontrol"
