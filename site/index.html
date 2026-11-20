@@ -3,22 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ngegame — Overthinker Studio | AI Gaming &amp; Live Streaming Center</title>
+  <title>Ngegame — Overthinker Studio</title>
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
   <style>
     :root {
       --bg: #0f130e;
-      --bg-alt: #141812;
-      --surface: #1a2018;
-      --surface-2: #222a1f;
-      --border: #2e3a29;
+      --bg-bar: rgba(16, 21, 15, 0.92);
+      --surface: #181e16;
+      --surface-2: #20281d;
+      --border: #2c3827;
       --olive: #6f9c4e;
       --olive-dark: #394f29;
       --blue: #009eeb;
       --orange: #ff9233;
       --text: #f3f6f1;
       --muted: #a3b19c;
-      --warn: #f59e0b;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
@@ -27,7 +26,7 @@
       font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background:
         radial-gradient(circle at 85% 0%, rgba(111, 156, 78, 0.16), transparent 36%),
-        radial-gradient(circle at 10% 10%, rgba(0, 158, 235, 0.12), transparent 35%),
+        radial-gradient(circle at 12% 12%, rgba(0, 158, 235, 0.12), transparent 34%),
         var(--bg);
       color: var(--text);
       line-height: 1.65;
@@ -35,31 +34,68 @@
     a { color: var(--blue); text-decoration: none; }
     a:hover { text-decoration: underline; }
     .container { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+
+    /* Header ala Overthinker Studio App Topbar */
     header {
-      position: sticky; top: 0; z-index: 30;
-      backdrop-filter: blur(12px);
-      background: rgba(15, 19, 14, 0.9);
+      position: sticky; top: 0; z-index: 40;
+      backdrop-filter: blur(14px);
+      background: var(--bg-bar);
       border-bottom: 1px solid var(--border);
     }
-    .nav {
+    .studio-header {
       display: flex; align-items: center; justify-content: space-between;
-      min-height: 66px; gap: 16px; flex-wrap: wrap; padding: 8px 0;
+      min-height: 64px; gap: 16px; flex-wrap: wrap; padding: 8px 0;
     }
-    .brand {
-      display: flex; align-items: center; gap: 12px; color: var(--text);
-      text-decoration: none;
+    .brand { display: flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; }
+    .brand-icon {
+      width: 38px; height: 38px; border-radius: 10px; padding: 5px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
     }
-    .brand img { width: 36px; height: 36px; }
-    .brand-title { font-weight: 800; font-size: 18px; letter-spacing: 0.01em; line-height: 1.1; }
+    .brand-icon img { width: 100%; height: 100%; }
+    .brand-title { font-weight: 800; font-size: 17px; line-height: 1.1; }
     .brand-sub { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); }
-    .nav-links { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 13px; }
-    .nav-links a { color: var(--muted); font-weight: 600; }
-    .nav-links a:hover { color: var(--text); text-decoration: none; }
-    .nav-cta {
-      padding: 8px 14px; border-radius: 10px;
-      background: var(--olive-dark); border: 1px solid var(--olive);
-      color: #fff !important; font-size: 12.5px;
+    .nav-pill {
+      display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 4px;
     }
+    .nav-pill a {
+      color: var(--muted); font-size: 12.5px; font-weight: 600;
+      padding: 6px 12px; border-radius: 8px; transition: background 0.15s, color 0.15s;
+    }
+    .nav-pill a:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .status-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+      background: rgba(111, 156, 78, 0.14); border: 1px solid rgba(111, 156, 78, 0.35);
+      color: #cbe6b7;
+    }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+    }
+    .nav-cta {
+      padding: 8px 14px; border-radius: 10px; font-weight: 600; font-size: 12.5px;
+      background: var(--olive-dark); border: 1px solid var(--olive); color: #fff;
+    }
+    .nav-cta:hover { background: var(--olive); text-decoration: none; }
+
+    /* Scroll Reveal Animations */
+    .reveal {
+      opacity: 0;
+      transform: translateY(26px);
+      transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1), transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .reveal.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .delay-1 { transition-delay: 0.08s; }
+    .delay-2 { transition-delay: 0.16s; }
+    .delay-3 { transition-delay: 0.24s; }
+
     .prerelease-banner {
       margin-top: 24px;
       display: flex; align-items: flex-start; gap: 12px;
@@ -72,20 +108,19 @@
     .pill {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 6px 14px; border-radius: 999px;
-      background: rgba(111, 156, 78, 0.16);
-      border: 1px solid rgba(111, 156, 78, 0.45);
+      background: rgba(111, 156, 78, 0.16); border: 1px solid rgba(111, 156, 78, 0.45);
       color: #cbe6b7; font-size: 12px; font-weight: 600; margin-bottom: 16px;
     }
     h1 { font-size: clamp(30px, 5vw, 48px); line-height: 1.15; margin: 0 0 16px; }
     .hero p { max-width: 740px; margin: 0 auto 28px; color: var(--muted); font-size: 16px; }
     .cta-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
     .btn {
-      display: inline-flex; align-items: center; gap: 8px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
       padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 14px;
       border: 1px solid var(--border); background: var(--surface); color: var(--text);
       transition: transform 0.15s ease, border-color 0.15s ease;
     }
-    .btn:hover { transform: translateY(-1px); border-color: var(--olive); text-decoration: none; }
+    .btn:hover { transform: translateY(-2px); border-color: var(--olive); text-decoration: none; }
     .btn-win { background: linear-gradient(135deg, #009eeb, #1d4ed8); border-color: transparent; color: #fff; }
     .btn-mac { background: linear-gradient(135deg, #394f29, #6f9c4e); border-color: transparent; color: #fff; }
     .stack-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
@@ -93,25 +128,39 @@
       font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
       background: var(--surface); border: 1px solid var(--border); color: var(--muted);
     }
-    section { padding: 42px 0; }
-    h2 { font-size: 25px; margin: 0 0 8px; }
+
+    section { padding: 44px 0; }
+    h2 { font-size: 26px; margin: 0 0 8px; }
     .sub { color: var(--muted); font-size: 14px; margin: 0 0 24px; }
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 18px; }
-    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+
     .card {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 16px; padding: 20px;
+      border-radius: 16px; padding: 22px;
+      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     }
-    .card h3 { margin: 0 0 8px; font-size: 16px; color: #ffffff; }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--olive);
+      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32);
+    }
+
+    /* Sejajar Download Cards */
+    .download-card {
+      display: flex; flex-direction: column; justify-content: space-between; height: 100%;
+    }
+    .download-footer { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .download-footer .btn { width: 100%; }
+
+    .card h3 { margin: 0 0 8px; font-size: 16px; color: #fff; }
     .card p, .card li { color: var(--muted); font-size: 13.5px; }
     .card ol, .card ul { padding-left: 18px; margin: 8px 0 0; }
     .tag {
       display: inline-block; font-size: 11px; font-weight: 700;
-      padding: 3px 8px; border-radius: 6px; margin-bottom: 10px;
+      padding: 4px 10px; border-radius: 6px; margin-bottom: 10px;
       background: rgba(111, 156, 78, 0.18); color: #cbe6b7; border: 1px solid rgba(111, 156, 78, 0.35);
     }
-    .shot { width: 100%; border-radius: 12px; border: 1px solid var(--border); display: block; background: #090b10; }
-    .shot-cap { margin-top: 10px; font-size: 13px; color: var(--muted); text-align: center; }
     code {
       background: var(--surface-2); padding: 2px 6px; border-radius: 6px;
       font-size: 12.5px; color: #bfe8a1;
@@ -120,6 +169,78 @@
       background: #0c0f0b; border: 1px solid var(--border); border-radius: 10px;
       padding: 12px; overflow-x: auto; font-size: 12px; color: #d9f99d;
     }
+
+    /* Guide Cards dengan Ikon & Contoh Gambar */
+    .guide-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .guide-icon {
+      width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(111, 156, 78, 0.16); border: 1px solid rgba(111, 156, 78, 0.4);
+      color: #cbe6b7;
+    }
+    .guide-thumb {
+      margin-top: 14px; border-radius: 10px; overflow: hidden;
+      border: 1px solid var(--border); background: #0b0d12;
+    }
+    .guide-thumb img {
+      width: 100%; height: 150px; object-fit: cover; object-position: top; display: block;
+      transition: transform 0.35s ease;
+    }
+    .card:hover .guide-thumb img { transform: scale(1.03); }
+
+    /* Slider Otomatis Besar untuk Pratinjau Aplikasi */
+    .slider-wrap {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 24px 54px rgba(0, 0, 0, 0.45);
+    }
+    .slider-viewport {
+      position: relative;
+      overflow: hidden;
+      border-radius: 12px;
+      background: #090b10;
+      border: 1px solid var(--border);
+    }
+    .slider-track {
+      display: flex;
+      transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .slider-slide {
+      min-width: 100%;
+      position: relative;
+    }
+    .slider-slide img {
+      width: 100%;
+      max-height: 620px;
+      object-fit: contain;
+      display: block;
+      background: #090b10;
+    }
+    .slider-caption {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap;
+      padding: 14px 6px 4px;
+    }
+    .slider-title { font-size: 15px; font-weight: 700; color: #fff; }
+    .slider-desc { font-size: 13px; color: var(--muted); }
+    .slider-controls { display: flex; align-items: center; gap: 8px; }
+    .slider-btn {
+      width: 36px; height: 36px; border-radius: 10px; cursor: pointer;
+      background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+      font-size: 16px; font-weight: 700;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .slider-btn:hover { border-color: var(--olive); background: var(--olive-dark); }
+    .slider-dots { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 10px; }
+    .slider-dot {
+      width: 10px; height: 10px; border-radius: 999px; border: none; cursor: pointer;
+      background: var(--border); transition: width 0.25s ease, background 0.25s ease;
+    }
+    .slider-dot.active { width: 28px; background: var(--olive); }
+
     footer {
       border-top: 1px solid var(--border); padding: 32px 0 48px;
       color: var(--muted); font-size: 13px; text-align: center;
@@ -128,34 +249,39 @@
 </head>
 <body>
   <header>
-    <div class="container nav">
+    <div class="container studio-header">
       <a class="brand" href="#top">
-        <img src="assets/icon.svg" alt="Ngegame Logo" />
+        <div class="brand-icon"><img src="assets/icon.svg" alt="Ngegame" /></div>
         <div>
           <div class="brand-title"><span style="color:var(--blue)">Nge</span><span style="color:var(--orange)">game</span></div>
           <div class="brand-sub">Overthinker Studio</div>
         </div>
       </a>
-      <nav class="nav-links">
-        <a href="#tentang">Tentang Aplikasi</a>
+
+      <nav class="nav-pill">
+        <a href="#tentang">Tentang</a>
         <a href="#unduhan">Download</a>
         <a href="#panduan">Panduan</a>
         <a href="#pratinjau">Tampilan</a>
         <a href="#dukungan">Dukungan</a>
-        <a class="nav-cta" href="#unduhan">Unduh v0.1.0</a>
       </nav>
+
+      <div class="header-right">
+        <span class="status-chip"><span class="status-dot"></span> Pre-Release v0.1.0</span>
+        <a class="nav-cta" href="#unduhan">Unduh Installer</a>
+      </div>
     </div>
   </header>
 
   <main id="top" class="container">
-    <div class="prerelease-banner">
+    <div class="prerelease-banner reveal">
       <strong>Status Tahap Pre-Release (v0.1.0):</strong>
       <span>
         Aplikasi ini masih berada pada tahap pengembangan awal (<em>Public Testing Pre-release</em>). Fitur inti sudah aktif dan dapat diuji, namun beberapa modul dan kompatibilitas perangkat Windows/macOS terus disempurnakan.
       </span>
     </div>
 
-    <section class="hero">
+    <section class="hero reveal">
       <div class="pill">Overthinker Studio &bull; Desktop AI Gaming &amp; Streaming Center</div>
       <h1>Kendali AI Gaming, Visi Layar &amp; Studio Siaran dalam Satu Aplikasi</h1>
       <p>
@@ -176,21 +302,21 @@
       </div>
     </section>
 
-    <section id="tentang">
+    <section id="tentang" class="reveal">
       <h2>Apa Itu Ngegame?</h2>
       <p class="sub">Dirancang oleh Overthinker Studio agar AI dapat mengamati game, membantu aksi secara aman, dan mengomentari permainan saat live streaming.</p>
       <div class="grid-3">
-        <div class="card">
+        <div class="card reveal delay-1">
           <div class="tag">01 &bull; Pustaka &amp; Adaptor</div>
           <h3>Deteksi Steam &amp; Profil Game</h3>
           <p>Memindai game Steam lokal secara otomatis dan menerapkan profil strategi/kontroler aman (<em>allowlist</em>) per genre tanpa meminta kata sandi Steam Anda.</p>
         </div>
-        <div class="card">
+        <div class="card reveal delay-2">
           <div class="tag">02 &bull; AI &amp; Pengawasan Manusia</div>
           <h3>Kendali Bertingkat L1 / L2 / L3</h3>
           <p>AI membaca layar melalui Python Vision Worker (Ollama lokal atau Cloud LLM) dengan kontrol manusia penuh: <strong>L2 Wajib Persetujuan</strong>, <strong>Takeover</strong>, dan <strong>Emergency Stop</strong> instan.</p>
         </div>
-        <div class="card">
+        <div class="card reveal delay-3">
           <div class="tag">03 &bull; Studio Suara &amp; Siaran</div>
           <h3>OBS WebSocket &amp; VoxCPM 2.0</h3>
           <p>Menghubungkan OBS Studio untuk kontrol adegan dan pratinjau output, menyimpan Stream Key YouTube/Twitch di OS Keychain/Credential Manager, serta komentar suara Bahasa Indonesia.</p>
@@ -198,59 +324,125 @@
       </div>
     </section>
 
-    <section id="unduhan">
+    <section id="unduhan" class="reveal">
       <h2>Download Installer (Pre-Release v0.1.0)</h2>
       <p class="sub">Pilih paket sesuai sistem operasi Anda. Seluruh berkas rilis resmi tersedia di halaman GitHub Releases.</p>
       <div class="grid-2">
-        <div class="card">
-          <div class="tag">Windows 10 / 11 (x64)</div>
-          <h3>Windows Installer (.exe NSIS)</h3>
-          <p>Paket instalasi lengkap berisi aplikasi Electron, backend Node.js, dan database SQLite lokal.</p>
-          <ul>
-            <li>Berkas: <code>Overthinker-Ngegame-Setup-0.1.0-x64.exe</code></li>
-            <li>Verifikasi checksum melalui <code>SHA256SUMS.txt</code> di PowerShell:</li>
-          </ul>
-          <pre>Get-FileHash .\Overthinker-Ngegame-Setup-0.1.0-x64.exe -Algorithm SHA256</pre>
-          <p><a class="btn btn-win" data-repo-link="/releases" href="#">Unduh untuk Windows &rarr;</a></p>
+        <div class="card download-card reveal delay-1">
+          <div>
+            <div class="tag">Windows 10 / 11 (x64)</div>
+            <h3>Windows Installer (.exe NSIS)</h3>
+            <p>Paket instalasi lengkap berisi aplikasi Electron, backend Node.js, dan database SQLite lokal.</p>
+            <ul>
+              <li>Berkas: <code>Overthinker-Ngegame-Setup-0.1.0-x64.exe</code></li>
+              <li>Verifikasi checksum melalui <code>SHA256SUMS.txt</code> di PowerShell:</li>
+            </ul>
+            <pre>Get-FileHash .\Overthinker-Ngegame-Setup-0.1.0-x64.exe -Algorithm SHA256</pre>
+          </div>
+          <div class="download-footer">
+            <a class="btn btn-win" data-repo-link="/releases" href="#">Unduh untuk Windows &rarr;</a>
+          </div>
         </div>
 
-        <div class="card">
-          <div class="tag">macOS Apple Silicon (arm64)</div>
-          <h3>macOS Installer (.dmg / .zip)</h3>
-          <p>Berjalan native di Mac M1/M2/M3/M4. Bila dibuka pertama kali tanpa sertifikat Apple Developer, klik kanan aplikasi &rarr; pilih <strong>Open</strong>.</p>
-          <ul>
-            <li>Berkas: <code>Overthinker-Ngegame-0.1.0-arm64.dmg</code> atau <code>.zip</code></li>
-            <li>Pastikan izin <em>Screen Recording</em> &amp; <em>Accessibility</em> diaktifkan.</li>
-          </ul>
-          <p><a class="btn btn-mac" data-repo-link="/releases" href="#">Unduh untuk macOS &rarr;</a></p>
+        <div class="card download-card reveal delay-2">
+          <div>
+            <div class="tag">macOS Apple Silicon (arm64)</div>
+            <h3>macOS Installer (.dmg / .zip)</h3>
+            <p>Berjalan native di Mac M1/M2/M3/M4. Bila dibuka pertama kali tanpa sertifikat Apple Developer, klik kanan aplikasi &rarr; pilih <strong>Open</strong>.</p>
+            <ul>
+              <li>Berkas: <code>Overthinker-Ngegame-0.1.0-arm64.dmg</code> atau <code>.zip</code></li>
+              <li>Pastikan izin <em>Screen Recording</em> &amp; <em>Accessibility</em> diaktifkan.</li>
+            </ul>
+          </div>
+          <div class="download-footer">
+            <a class="btn btn-mac" data-repo-link="/releases" href="#">Unduh untuk macOS &rarr;</a>
+          </div>
         </div>
       </div>
     </section>
 
-    <section id="panduan">
+    <section id="pratinjau" class="reveal">
+      <h2>Pratinjau Aplikasi</h2>
+      <p class="sub">Tampilan langsung antarmuka Overthinker Studio dalam ukuran penuh (otomatis berganti setiap 4,5 detik).</p>
+
+      <div class="slider-wrap" id="previewSlider">
+        <div class="slider-viewport">
+          <div class="slider-track" id="sliderTrack">
+            <div class="slider-slide">
+              <img src="assets/screenshots/dashboard-dark.png" alt="Dasbor Ngegame Mode Gelap" />
+            </div>
+            <div class="slider-slide">
+              <img src="assets/screenshots/dashboard-light.png" alt="Dasbor Ngegame Mode Terang" />
+            </div>
+            <div class="slider-slide">
+              <img src="assets/screenshots/ai-command-center.png" alt="Pusat Kendali AI" />
+            </div>
+            <div class="slider-slide">
+              <img src="assets/screenshots/streaming-studio.png" alt="Studio Siaran OBS" />
+            </div>
+          </div>
+        </div>
+
+        <div class="slider-caption">
+          <div>
+            <div class="slider-title" id="sliderTitle">Dasbor Operasional — Mode Gelap</div>
+            <div class="slider-desc" id="sliderDesc">Telemetri CPU/RAM/GPU real-time, status AI, OBS, dan log worker.</div>
+          </div>
+          <div class="slider-controls">
+            <button class="slider-btn" id="prevSlide" type="button" aria-label="Slide sebelumnya">&larr;</button>
+            <button class="slider-btn" id="nextSlide" type="button" aria-label="Slide berikutnya">&rarr;</button>
+          </div>
+        </div>
+
+        <div class="slider-dots" id="sliderDots"></div>
+      </div>
+    </section>
+
+    <section id="panduan" class="reveal">
       <h2>Panduan Konfigurasi Lengkap</h2>
-      <p class="sub">Ikuti panduan di bawah ini bila aplikasi menampilkan pesan perlu konfigurasi OBS, kunci siaran, Steam, atau izin macOS.</p>
+      <p class="sub">Ikuti panduan bergambar di bawah ini bila aplikasi menampilkan pesan perlu konfigurasi OBS, kunci siaran, Steam, atau izin macOS.</p>
       <div class="grid-2">
-        <article class="card" id="panduan-obs">
-          <h3>1. Setup OBS Studio, YouTube Live, &amp; Twitch</h3>
+        <article class="card reveal delay-1" id="panduan-obs">
+          <div class="guide-head">
+            <div class="guide-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <h3>1. Setup OBS Studio, YouTube Live, &amp; Twitch</h3>
+          </div>
           <ol>
             <li>Buka <strong>OBS Studio 28+</strong> &rarr; <code>Tools &rarr; WebSocket Server Settings</code> &rarr; centang <strong>Enable WebSocket server</strong> pada port <code>4455</code>.</li>
             <li>Di menu <strong>Studio Siaran</strong> pada Ngegame, klik <strong>Hubungkan OBS WebSocket</strong>.</li>
-            <li>Salin Stream Key dari <strong>YouTube Studio</strong> atau <strong>Twitch Creator Dashboard</strong> ke panel <strong>Manajer Kredensial</strong> sebelum menekan <strong>Mulai Siaran</strong>.</li>
+            <li>Salin Stream Key dari <strong>YouTube Studio</strong> atau <strong>Twitch Creator Dashboard</strong> ke <strong>Manajer Kredensial</strong> sebelum menekan <strong>Mulai Siaran</strong>.</li>
           </ol>
+          <div class="guide-thumb">
+            <img src="assets/screenshots/streaming-studio.png" alt="Contoh Tampilan Studio Siaran OBS" />
+          </div>
         </article>
 
-        <article class="card" id="panduan-macos">
-          <h3>2. Izin Wajib macOS (System Settings)</h3>
+        <article class="card reveal delay-2" id="panduan-macos">
+          <div class="guide-head">
+            <div class="guide-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <h3>2. Izin Wajib macOS (System Settings)</h3>
+          </div>
           <ol>
-            <li>Buka <strong>System Settings &rarr; Privacy &amp; Security</strong>.</li>
-            <li>Aktifkan <strong>Ngegame</strong> di <strong>Screen &amp; System Audio Recording</strong> untuk Monitor Visi.</li>
-            <li>Aktifkan <strong>Ngegame</strong> di <strong>Accessibility</strong> dan <strong>Input Monitoring</strong> agar Kendali AI dapat mengirim input aman saat diizinkan.</li>
+            <li>Buka <strong>System Settings &rarr; Privacy &amp; Security</strong> di macOS.</li>
+            <li>Aktifkan <strong>Ngegame</strong> pada <strong>Screen &amp; System Audio Recording</strong> untuk Monitor Visi.</li>
+            <li>Aktifkan <strong>Ngegame</strong> pada <strong>Accessibility</strong> dan <strong>Input Monitoring</strong> agar Kendali AI dapat mengirim input aman saat diizinkan.</li>
           </ol>
+          <div class="guide-thumb">
+            <img src="assets/screenshots/ai-command-center.png" alt="Contoh Tampilan Kendali AI dan Izin L1-L3" />
+          </div>
         </article>
 
-        <article class="card" id="panduan-steam">
-          <h3>3. Setup Pustaka Game Steam</h3>
+        <article class="card reveal delay-1" id="panduan-steam">
+          <div class="guide-head">
+            <div class="guide-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="4"/><path d="M6 12h4m-2-2v4m7-1h.01M18 11h.01"/></svg>
+            </div>
+            <h3>3. Setup Pustaka Game Steam</h3>
+          </div>
           <ol>
             <li>Pastikan <strong>Steam Client</strong> sudah terpasang di perangkat Anda.</li>
             <li>Buka menu <strong>Pustaka Game</strong> di Ngegame lalu klik <strong>Pindai Pustaka</strong>.</li>
@@ -258,8 +450,13 @@
           </ol>
         </article>
 
-        <article class="card" id="panduan-ai">
-          <h3>4. Konfigurasi AI Brain (Ollama / OpenAI)</h3>
+        <article class="card reveal delay-2" id="panduan-ai">
+          <div class="guide-head">
+            <div class="guide-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+            </div>
+            <h3>4. Konfigurasi AI Brain (Ollama / OpenAI)</h3>
+          </div>
           <ul>
             <li><strong>Ollama (Lokal):</strong> Jalankan layanan Ollama lokal untuk penalaran gratis di perangkat sendiri.</li>
             <li><strong>OpenAI (Cloud):</strong> Opsi cadangan dengan kunci API pribadi.</li>
@@ -267,46 +464,31 @@
           </ul>
         </article>
 
-        <article class="card" id="panduan-suara">
-          <h3>5. Studio Suara AI (VoxCPM 2.0)</h3>
+        <article class="card reveal delay-1" id="panduan-suara">
+          <div class="guide-head">
+            <div class="guide-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+            </div>
+            <h3>5. Studio Suara AI (VoxCPM 2.0)</h3>
+          </div>
           <ul>
             <li>Gunakan panel <strong>Sampel Cloning Suara</strong> untuk memutar 3 preset suara Bahasa Indonesia atau mengunggah audio referensi (<code>.wav</code>/<code>.mp3</code>).</li>
             <li>Jika server VoxCPM 2.0 lokal belum aktif, aplikasi tetap aman dengan suara cadangan lokal.</li>
           </ul>
         </article>
 
-        <article class="card" id="dukungan">
-          <h3>6. Tentang Pengembang &amp; Dukungan</h3>
+        <article class="card reveal delay-2" id="dukungan">
+          <div class="guide-head">
+            <div class="guide-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            </div>
+            <h3>6. Tentang Pengembang &amp; Dukungan</h3>
+          </div>
           <p>
             <strong>Ngegame</strong> dikembangkan oleh <strong>Overthinker Studio</strong> (<code>OverthinkerID</code>). Dukungan Anda melalui Star GitHub, laporan bug, atau kontribusi kode sangat membantu pengembangan ke versi stabil <code>v1.0.0</code>.
           </p>
-          <p>
-            <a data-repo-link="/issues" href="#">Laporkan Bug / Ajukan Fitur &rarr;</a>
-          </p>
+          <p><a data-repo-link="/issues" href="#">Laporkan Bug / Ajukan Fitur &rarr;</a></p>
         </article>
-      </div>
-    </section>
-
-    <section id="pratinjau">
-      <h2>Pratinjau Aplikasi</h2>
-      <p class="sub">Antarmuka Overthinker Studio dalam Mode Gelap, Mode Terang, Pusat Kendali AI, dan Studio Siaran.</p>
-      <div class="grid-2">
-        <div class="card">
-          <img class="shot" src="assets/screenshots/dashboard-dark.png" alt="Dasbor Ngegame Mode Gelap" />
-          <div class="shot-cap">Dasbor Operasional — Mode Gelap</div>
-        </div>
-        <div class="card">
-          <img class="shot" src="assets/screenshots/dashboard-light.png" alt="Dasbor Ngegame Mode Terang" />
-          <div class="shot-cap">Dasbor Operasional — Mode Terang</div>
-        </div>
-        <div class="card">
-          <img class="shot" src="assets/screenshots/ai-command-center.png" alt="Pusat Kendali AI" />
-          <div class="shot-cap">Kendali AI &amp; Pengawasan Manusia</div>
-        </div>
-        <div class="card">
-          <img class="shot" src="assets/screenshots/streaming-studio.png" alt="Studio Siaran OBS" />
-          <div class="shot-cap">Studio Siaran OBS &amp; Multistream</div>
-        </div>
       </div>
     </section>
   </main>
@@ -327,6 +509,68 @@
         links[i].setAttribute('target', '_blank');
         links[i].setAttribute('rel', 'noopener noreferrer');
       }
+
+      // Scroll Reveal Observer
+      var reveals = document.querySelectorAll('.reveal');
+      if ('IntersectionObserver' in window) {
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-visible');
+              io.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.12 });
+        reveals.forEach(function (el) { io.observe(el); });
+      } else {
+        reveals.forEach(function (el) { el.classList.add('is-visible'); });
+      }
+
+      // Auto Slider Pratinjau
+      var slides = [
+        { title: 'Dasbor Operasional — Mode Gelap', desc: 'Telemetri CPU/RAM/GPU real-time, status AI, OBS, dan log worker.' },
+        { title: 'Dasbor Operasional — Mode Terang', desc: 'Tampilan kontras tinggi untuk penggunaan siang hari dengan tata letak identik.' },
+        { title: 'Kendali AI & Pengawasan Manusia (L1/L2/L3)', desc: 'Antrean persetujuan aksi, pengambilalihan kontrol manusia, dan Emergency Stop.' },
+        { title: 'Studio Siaran OBS & Multistream', desc: 'Kontrol OBS WebSocket v5, pratinjau adegan, dan manajemen kunci YouTube & Twitch.' }
+      ];
+      var track = document.getElementById('sliderTrack');
+      var titleEl = document.getElementById('sliderTitle');
+      var descEl = document.getElementById('sliderDesc');
+      var dotsWrap = document.getElementById('sliderDots');
+      var wrap = document.getElementById('previewSlider');
+      var idx = 0;
+      var timer = null;
+
+      function renderSlide(nextIdx) {
+        idx = (nextIdx + slides.length) % slides.length;
+        track.style.transform = 'translateX(-' + (idx * 100) + '%)';
+        titleEl.textContent = slides[idx].title;
+        descEl.textContent = slides[idx].desc;
+        var dots = dotsWrap.querySelectorAll('.slider-dot');
+        for (var d = 0; d < dots.length; d++) {
+          dots[d].classList.toggle('active', d === idx);
+        }
+      }
+
+      slides.forEach(function (_, i) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'slider-dot' + (i === 0 ? ' active' : '');
+        b.setAttribute('aria-label', 'Slide ' + (i + 1));
+        b.addEventListener('click', function () { renderSlide(i); resetTimer(); });
+        dotsWrap.appendChild(b);
+      });
+
+      function resetTimer() {
+        if (timer) clearInterval(timer);
+        timer = setInterval(function () { renderSlide(idx + 1); }, 4500);
+      }
+
+      document.getElementById('prevSlide').addEventListener('click', function () { renderSlide(idx - 1); resetTimer(); });
+      document.getElementById('nextSlide').addEventListener('click', function () { renderSlide(idx + 1); resetTimer(); });
+      wrap.addEventListener('mouseenter', function () { if (timer) clearInterval(timer); });
+      wrap.addEventListener('mouseleave', resetTimer);
+      resetTimer();
     })();
   </script>
 </body>
