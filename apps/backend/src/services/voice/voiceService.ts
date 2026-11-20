@@ -161,17 +161,21 @@ export class VoiceStudioService {
   private async synthesizeViaVoxCpm(
     text: string,
     emotion: VoiceEmotion,
+    referenceAudioBase64?: string,
+    referenceFileName?: string,
   ): Promise<string | undefined> {
     const res = await fetch(`${this.settings.voxcpmBaseUrl}/api/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(15000),
       body: JSON.stringify({
         text,
         language: 'id',
         speed: this.settings.speed,
         emotion,
         profile_id: this.settings.activeProfileId,
+        ...(referenceAudioBase64 ? { reference_audio_base64: referenceAudioBase64 } : {}),
+        ...(referenceFileName ? { reference_filename: referenceFileName } : {}),
       }),
     });
 
@@ -227,7 +231,12 @@ export class VoiceStudioService {
     try {
       if (this.settings.activeEngine === 'voxcpm2') {
         try {
-          audioBase64 = await this.synthesizeViaVoxCpm(text, emotion);
+          audioBase64 = await this.synthesizeViaVoxCpm(
+            text,
+            emotion,
+            request.referenceAudioBase64,
+            request.referenceFileName,
+          );
           this.lastError = null;
         } catch (voxErr) {
           const msg = voxErr instanceof Error ? voxErr.message : String(voxErr);

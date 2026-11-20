@@ -12,11 +12,18 @@ import {
   type AIProviderHealth,
   type AnalyticsSummaryReport,
   type AppInfo,
+  type CalibrationSessionState,
   type ControllerExecuteRequest,
   type ControllerExecutionResult,
   type ControllerState,
   type DetectedWindow,
   type GameAdapterDefinition,
+  type GameBrainCycleResult,
+  type GameMemoryRecord,
+  type GameProfile,
+  type PipelineDiagnosticsReport,
+  type StardewCapabilityLevel,
+  type SteamScannerDiagnostics,
   type SaveStreamCredentialRequest,
   type SteamGameRecord,
   type SteamInstallationStatus,
@@ -278,6 +285,35 @@ function registerIpcHandlers(): void {
       return fetchBackendJson<SteamStopResult>(`/api/steam/games/${validAppId}/stop`, {
         method: 'POST',
       });
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.STEAM_MANUAL_LIBS_LIST, async (): Promise<string[]> => {
+    const data = await fetchBackendJson<{ paths?: string[] }>('/api/steam/libraries/manual');
+    return data.paths ?? [];
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.STEAM_MANUAL_LIBS_ADD,
+    async (_event, libraryPath: string): Promise<string[]> => {
+      const data = await fetchBackendJson<{ paths?: string[] }>('/api/steam/libraries/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ libraryPath }),
+      });
+      return data.paths ?? [];
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.STEAM_MANUAL_LIBS_REMOVE,
+    async (_event, libraryPath: string): Promise<string[]> => {
+      const data = await fetchBackendJson<{ paths?: string[] }>('/api/steam/libraries/manual', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ libraryPath }),
+      });
+      return data.paths ?? [];
     },
   );
 
@@ -709,6 +745,123 @@ function registerIpcHandlers(): void {
       return response.text();
     },
   );
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_DIAGNOSTICS, async (): Promise<PipelineDiagnosticsReport> => {
+    return fetchBackendJson<PipelineDiagnosticsReport>('/api/adaptation/diagnostics');
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_STEAM_DIAGNOSTICS, async (): Promise<SteamScannerDiagnostics | null> => {
+    return fetchBackendJson<SteamScannerDiagnostics | null>('/api/adaptation/steam/diagnostics');
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_PROFILES_LIST, async (): Promise<GameProfile[]> => {
+    const data = await fetchBackendJson<{ profiles?: GameProfile[] }>('/api/adaptation/profiles');
+    return data.profiles ?? [];
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_PROFILE_GET, async (_event, gameId: string) => {
+    return fetchBackendJson<{ profile: GameProfile; validation: { valid: boolean; errors: string[]; warnings: string[] } }>(`/api/adaptation/profiles/${encodeURIComponent(gameId)}`);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_PROFILE_SAVE, async (_event, profile: GameProfile): Promise<GameProfile> => {
+    const data = await fetchBackendJson<{ profile: GameProfile }>(`/api/adaptation/profiles/${encodeURIComponent(profile.gameId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profile),
+    });
+    return data.profile;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_PROFILE_RESET, async (_event, gameId: string): Promise<GameProfile> => {
+    const data = await fetchBackendJson<{ profile: GameProfile }>(`/api/adaptation/profiles/${encodeURIComponent(gameId)}/reset`, {
+      method: 'POST',
+    });
+    return data.profile;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_PROFILE_IMPORT, async (_event, json: string): Promise<GameProfile> => {
+    const data = await fetchBackendJson<{ profile: GameProfile }>('/api/adaptation/profiles/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ json }),
+    });
+    return data.profile;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_PROFILE_EXPORT, async (_event, gameId: string): Promise<string> => {
+    const data = await fetchBackendJson<{ json: string }>(`/api/adaptation/profiles/${encodeURIComponent(gameId)}/export`);
+    return data.json;
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.ADAPTATION_PROFILE_DUPLICATE,
+    async (_event, sourceGameId: string, newGameId: string, newGameName: string): Promise<GameProfile> => {
+      const data = await fetchBackendJson<{ profile: GameProfile }>(
+        `/api/adaptation/profiles/${encodeURIComponent(sourceGameId)}/duplicate`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newGameId, newGameName }),
+        },
+      );
+      return data.profile;
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ADAPTATION_PROFILE_DELETE,
+    async (_event, gameId: string): Promise<{ deleted: boolean; gameId: string }> => {
+      return fetchBackendJson<{ deleted: boolean; gameId: string }>(
+        `/api/adaptation/profiles/${encodeURIComponent(gameId)}`,
+        { method: 'DELETE' },
+      );
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ADAPTATION_PROFILE_HISTORY,
+    async (_event, gameId: string, limit = 25): Promise<import('@ngegame/shared').GameProfileVersionRecord[]> => {
+      const safeLimit = clampLimit(limit, 25, 100);
+      const data = await fetchBackendJson<{ history?: import('@ngegame/shared').GameProfileVersionRecord[] }>(
+        `/api/adaptation/profiles/${encodeURIComponent(gameId)}/history?limit=${safeLimit}`,
+      );
+      return data.history ?? [];
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_BRAIN_CYCLE, async (_event, req: { gameId: string; windowTitle?: string; dryRun?: boolean; goalOverride?: string }): Promise<GameBrainCycleResult> => {
+    return fetchBackendJson<GameBrainCycleResult>('/api/adaptation/brain/cycle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_MEMORY_LIST, async (_event, gameId: string, limit = 30): Promise<GameMemoryRecord[]> => {
+    const safeLimit = clampLimit(limit, 30, 100);
+    const data = await fetchBackendJson<{ memories?: GameMemoryRecord[] }>(`/api/adaptation/memory/${encodeURIComponent(gameId)}?limit=${safeLimit}`);
+    return data.memories ?? [];
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_MEMORY_CLEAR, async (_event, gameId: string): Promise<number> => {
+    const data = await fetchBackendJson<{ deleted: number }>(`/api/adaptation/memory/${encodeURIComponent(gameId)}`, { method: 'DELETE' });
+    return data.deleted;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_CALIBRATION_GET, async (_event, gameId: string): Promise<CalibrationSessionState> => {
+    return fetchBackendJson<CalibrationSessionState>(`/api/adaptation/calibration/${encodeURIComponent(gameId)}`);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_CALIBRATION_STEP, async (_event, gameId: string, step: number): Promise<CalibrationSessionState> => {
+    const validStep = assertPositiveInt(step, 'step');
+    return fetchBackendJson<CalibrationSessionState>(`/api/adaptation/calibration/${encodeURIComponent(gameId)}/step/${validStep}`, {
+      method: 'POST',
+    });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADAPTATION_STARDEW_CAPS, async (_event, level: StardewCapabilityLevel = 1) => {
+    return fetchBackendJson<{ currentLevel: StardewCapabilityLevel; levels: Record<number, { title: string; capabilities: string[]; smapiNote?: string }> }>(`/api/adaptation/stardew/capabilities?level=${level}`);
+  });
 }
 
 async function createMainWindow(): Promise<void> {

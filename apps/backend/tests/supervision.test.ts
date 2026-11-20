@@ -79,8 +79,66 @@ describe('Human Supervision System', () => {
       await supervision.setPermissionLevel('L3');
       await assert.rejects(() => supervision.returnControlToAI());
 
-      // 6. Emergency Stop blocks all without closing game or OBS
+      // 6. Risk Assessment & High-Risk Destructive Action Gate even in L1
+      const lowRisk = supervision.assessActionRisk('MOVE_DIRECTION', 'north', 'Jalan ke ladang', 0.95);
+      assert.equal(lowRisk.riskLevel, 'low');
+      assert.equal(lowRisk.requiresExplicitApproval, false);
+
+      const medRisk = supervision.assessActionRisk('INTERACT', 'NPC Pierre', 'Bicara dengan NPC', 0.92);
+      assert.equal(medRisk.riskLevel, 'medium');
+      assert.equal(medRisk.requiresExplicitApproval, true);
+
+      const highRisk = supervision.assessActionRisk('USE_ITEM', 'Shipping Bin', 'Sell all parsnips', 0.98);
+      assert.equal(highRisk.riskLevel, 'high');
+      assert.equal(highRisk.requiredApprovalLevel, 'L3');
+      assert.equal(highRisk.requiresExplicitApproval, true);
+
+      const lowConfRisk = supervision.assessActionRisk('MOVE_DIRECTION', 'south', 'Ragu posisi', 0.45);
+      assert.equal(lowConfRisk.riskLevel, 'high');
+      assert.equal(lowConfRisk.requiresExplicitApproval, true);
+
+      await supervision.setPermissionLevel('L1');
+      await supervision.returnControlToAI();
+      const highRiskQueued = await supervision.submitAction({
+        actionType: 'USE_ITEM',
+        target: 'Trash Can',
+        rationale: 'Buang item dari inventory',
+        confidence: 0.99,
+        dryRun: true,
+      });
+      createdQueueIds.push(highRiskQueued.id);
+      assert.equal(highRiskQueued.status, 'pending');
+
+      const approvedHighRisk = await supervision.approveAction(highRiskQueued.id, 'Manusia setuju buang');
+      assert.equal(approvedHighRisk.status, 'executed');
+
+      // 7. Stop Task cancels pending queue items & pauses AI
       await supervision.setPermissionLevel('L2');
+      const pendingBeforeStop = await supervision.submitAction({
+        actionType: 'INTERACT',
+        target: 'Chest',
+        confidence: 0.9,
+        dryRun: true,
+      });
+      createdQueueIds.push(pendingBeforeStop.id);
+      assert.equal(pendingBeforeStop.status, 'pending');
+
+      const stoppedState = await supervision.stopTask();
+      assert.equal(stoppedState.aiPaused, true);
+      assert.equal(stoppedState.pendingCount, 0);
+
+      const blockedAfterStop = await supervision.submitAction({
+        actionType: 'MOVE_DIRECTION',
+        target: 'east',
+        confidence: 0.95,
+        dryRun: true,
+      });
+      createdQueueIds.push(blockedAfterStop.id);
+      assert.equal(blockedAfterStop.status, 'blocked');
+
+      await supervision.resumeAI();
+
+      // 8. Emergency Stop blocks all without closing game or OBS
       const emState = await supervision.emergencyStop();
       assert.equal(emState.emergencyStopped, true);
       assert.equal(emState.obsAffectedByEmergency, false);

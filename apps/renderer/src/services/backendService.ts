@@ -6,16 +6,23 @@ import type {
   AIProviderHealth,
   AnalyticsSummaryReport,
   AppInfo,
+  CalibrationSessionState,
   ControllerExecuteRequest,
   ControllerExecutionResult,
   ControllerState,
   DetectedWindow,
   GameAdapterDefinition,
+  GameBrainCycleResult,
+  GameMemoryRecord,
+  GameProfile,
+  PipelineDiagnosticsReport,
   SaveStreamCredentialRequest,
+  StardewCapabilityLevel,
   SteamGameRecord,
   SteamInstallationStatus,
   SteamLaunchResult,
   SteamScanResult,
+  SteamScannerDiagnostics,
   SteamStopResult,
   StreamingStatusResponse,
   StreamPlatform,
@@ -136,6 +143,38 @@ export const backendService = {
     return requestJson<SteamStopResult>(`/api/steam/games/${appId}/stop`, {
       method: 'POST',
     });
+  },
+
+  async getManualSteamLibraries(): Promise<string[]> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.getManualSteamLibraries();
+    }
+    const data = await requestJson<{ paths?: string[] }>('/api/steam/libraries/manual');
+    return data.paths ?? [];
+  },
+
+  async addManualSteamLibrary(libraryPath: string): Promise<string[]> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.addManualSteamLibrary(libraryPath);
+    }
+    const data = await requestJson<{ paths?: string[] }>('/api/steam/libraries/manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ libraryPath }),
+    });
+    return data.paths ?? [];
+  },
+
+  async removeManualSteamLibrary(libraryPath: string): Promise<string[]> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.removeManualSteamLibrary(libraryPath);
+    }
+    const data = await requestJson<{ paths?: string[] }>('/api/steam/libraries/manual', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ libraryPath }),
+    });
+    return data.paths ?? [];
   },
 
   async getVisionStatus(): Promise<VisionMonitorStatus> {
@@ -668,5 +707,163 @@ export const backendService = {
       throw new Error(`Export HTTP ${res.status}`);
     }
     return res.text();
+  },
+
+  async getAdaptationDiagnostics(): Promise<PipelineDiagnosticsReport> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.getAdaptationDiagnostics();
+    }
+    return requestJson<PipelineDiagnosticsReport>('/api/adaptation/diagnostics');
+  },
+
+  async getSteamDiagnostics(): Promise<SteamScannerDiagnostics | null> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.getSteamDiagnostics();
+    }
+    return requestJson<SteamScannerDiagnostics | null>('/api/adaptation/steam/diagnostics');
+  },
+
+  async listGameProfiles(): Promise<GameProfile[]> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.listGameProfiles();
+    }
+    const data = await requestJson<{ profiles?: GameProfile[] }>('/api/adaptation/profiles');
+    return data.profiles ?? [];
+  },
+
+  async getGameProfile(gameId: string): Promise<{ profile: GameProfile; validation: { valid: boolean; errors: string[]; warnings: string[] } }> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.getGameProfile(gameId);
+    }
+    return requestJson<{ profile: GameProfile; validation: { valid: boolean; errors: string[]; warnings: string[] } }>(`/api/adaptation/profiles/${encodeURIComponent(gameId)}`);
+  },
+
+  async saveGameProfile(profile: GameProfile): Promise<GameProfile> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.saveGameProfile(profile);
+    }
+    const data = await requestJson<{ profile: GameProfile }>(`/api/adaptation/profiles/${encodeURIComponent(profile.gameId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profile),
+    });
+    return data.profile;
+  },
+
+  async resetGameProfile(gameId: string): Promise<GameProfile> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.resetGameProfile(gameId);
+    }
+    const data = await requestJson<{ profile: GameProfile }>(`/api/adaptation/profiles/${encodeURIComponent(gameId)}/reset`, {
+      method: 'POST',
+    });
+    return data.profile;
+  },
+
+  async importGameProfile(json: string): Promise<GameProfile> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.importGameProfile(json);
+    }
+    const data = await requestJson<{ profile: GameProfile }>('/api/adaptation/profiles/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ json }),
+    });
+    return data.profile;
+  },
+
+  async exportGameProfile(gameId: string): Promise<string> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.exportGameProfile(gameId);
+    }
+    const data = await requestJson<{ json: string }>(`/api/adaptation/profiles/${encodeURIComponent(gameId)}/export`);
+    return data.json;
+  },
+
+  async duplicateGameProfile(sourceGameId: string, newGameId: string, newGameName: string): Promise<GameProfile> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.duplicateGameProfile(sourceGameId, newGameId, newGameName);
+    }
+    const data = await requestJson<{ profile: GameProfile }>(
+      `/api/adaptation/profiles/${encodeURIComponent(sourceGameId)}/duplicate`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newGameId, newGameName }),
+      },
+    );
+    return data.profile;
+  },
+
+  async deleteGameProfile(gameId: string): Promise<{ deleted: boolean; gameId: string }> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.deleteGameProfile(gameId);
+    }
+    return requestJson<{ deleted: boolean; gameId: string }>(
+      `/api/adaptation/profiles/${encodeURIComponent(gameId)}`,
+      { method: 'DELETE' },
+    );
+  },
+
+  async getGameProfileHistory(gameId: string, limit = 25): Promise<import('@ngegame/shared').GameProfileVersionRecord[]> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.getGameProfileHistory(gameId, limit);
+    }
+    const data = await requestJson<{ history?: import('@ngegame/shared').GameProfileVersionRecord[] }>(
+      `/api/adaptation/profiles/${encodeURIComponent(gameId)}/history?limit=${limit}`,
+    );
+    return data.history ?? [];
+  },
+
+  async runGameBrainCycle(req: { gameId: string; windowTitle?: string; dryRun?: boolean; goalOverride?: string }): Promise<GameBrainCycleResult> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.runGameBrainCycle(req);
+    }
+    return requestJson<GameBrainCycleResult>('/api/adaptation/brain/cycle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+  },
+
+  async listGameMemories(gameId: string, limit = 30): Promise<GameMemoryRecord[]> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.listGameMemories(gameId, limit);
+    }
+    const data = await requestJson<{ memories?: GameMemoryRecord[] }>(`/api/adaptation/memory/${encodeURIComponent(gameId)}?limit=${limit}`);
+    return data.memories ?? [];
+  },
+
+  async clearGameMemories(gameId: string): Promise<number> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.clearGameMemories(gameId);
+    }
+    const data = await requestJson<{ deleted: number }>(`/api/adaptation/memory/${encodeURIComponent(gameId)}`, {
+      method: 'DELETE',
+    });
+    return data.deleted;
+  },
+
+  async getCalibrationState(gameId: string): Promise<CalibrationSessionState> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.getCalibrationState(gameId);
+    }
+    return requestJson<CalibrationSessionState>(`/api/adaptation/calibration/${encodeURIComponent(gameId)}`);
+  },
+
+  async runCalibrationStep(gameId: string, step: number): Promise<CalibrationSessionState> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.runCalibrationStep(gameId, step);
+    }
+    return requestJson<CalibrationSessionState>(`/api/adaptation/calibration/${encodeURIComponent(gameId)}/step/${step}`, {
+      method: 'POST',
+    });
+  },
+
+  async getStardewCapabilities(level: StardewCapabilityLevel = 1) {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.getStardewCapabilities(level);
+    }
+    return requestJson<{ currentLevel: StardewCapabilityLevel; levels: Record<number, { title: string; capabilities: string[]; smapiNote?: string }> }>(`/api/adaptation/stardew/capabilities?level=${level}`);
   },
 };

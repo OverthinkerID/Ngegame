@@ -11,6 +11,7 @@ export interface DetectedWindow {
   title: string;
   owner: string;
   pid?: number;
+  focused?: boolean;
 }
 
 export interface VisionHudRegion {

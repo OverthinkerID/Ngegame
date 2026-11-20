@@ -71,6 +71,7 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
     name: string;
     sizeKb: number;
     url: string;
+    audioBase64: string;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +127,12 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
         text: textOverride ?? sampleText,
         emotion: emotionOverride ?? emotion,
         playAudio: true,
+        ...(customSample?.audioBase64
+          ? {
+              referenceAudioBase64: customSample.audioBase64,
+              referenceFileName: customSample.name,
+            }
+          : {}),
       });
       if (res.audioBase64) {
         const audio = new Audio(res.audioBase64);
@@ -171,12 +178,19 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
       URL.revokeObjectURL(customSample.url);
     }
     const url = URL.createObjectURL(file);
-    setCustomSample({
-      name: file.name,
-      sizeKb: Math.max(1, Math.round(file.size / 1024)),
-      url,
-    });
-    onNotify?.(`Sampel cloning "${file.name}" siap diputar.`, 'success');
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] ?? '' : dataUrl;
+      setCustomSample({
+        name: file.name,
+        sizeKb: Math.max(1, Math.round(file.size / 1024)),
+        url,
+        audioBase64: base64,
+      });
+      onNotify?.(`Sampel cloning "${file.name}" siap dikirim ke VoxCPM 2.0.`, 'success');
+    };
+    reader.readAsDataURL(file);
   };
 
   return (

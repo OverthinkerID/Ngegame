@@ -177,3 +177,60 @@ model ResourceSnapshot {
 
   @@index([createdAt])
 }
+
+model GameProfileRecord {
+  id              Int      @id @default(autoincrement())
+  gameId          String   @unique
+  gameName        String
+  platform        String
+  genre           String
+  adapterType     String
+  profileVersion  Int      @default(1)
+  isBuiltin       Boolean  @default(false)
+  profileJson     String
+  calibrationJson String   @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([genre])
+}
+
+model GameMemoryEntry {
+  id         Int      @id @default(autoincrement())
+  gameId     String
+  memoryType String
+  key        String
+  valueJson  String
+  confidence Float    @default(0.5)
+  createdAt  DateTime @default(now())
+
+  @@index([gameId, memoryType, createdAt])
+}
+
+model GameProfileVersion {
+  id             Int      @id @default(autoincrement())
+  gameId         String
+  profileVersion Int
+  changeSummary  String
+  author         String   @default("human")
+  profileJson    String
+  createdAt      DateTime @default(now())
+
+  @@index([gameId, profileVersion])
+}
+
+model AdaptationProposal {
+  id              Int       @id @default(autoincrement())
+  gameId          String
+  title           String
+  rationale       String
+  proposedChanges String
+  confidence      Float     @default(0.5)
+  status          String    @default("pending")
+  reviewedBy      String?
+  reviewNote      String?
+  createdAt       DateTime  @default(now())
+  reviewedAt      DateTime?
+
+  @@index([gameId, status, createdAt])
+}

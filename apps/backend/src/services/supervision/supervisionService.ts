@@ -16,6 +16,35 @@ import { getPrismaClient, recordSystemLog } from '../../db/prisma.js';
 import type { ControllerService } from '../controller/controllerService.js';
 
 const ALLOWED_SET = new Set<string>(ALLOWED_AI_ACTIONS);
+const LOW_RISK_ACTIONS = new Set<string>([
+  'OBSERVE_ONLY',
+  'WAIT',
+  'LOOK_AT',
+  'MOVE_DIRECTION',
+  'NAVIGATE_WAYPOINT',
+]);
+const DESTRUCTIVE_KEYWORDS = [
+  'sell',
+  'jual',
+  'drop',
+  'discard',
+  'buang',
+  'delete',
+  'hapus',
+  'trash',
+  'buy',
+  'beli',
+  'upgrade',
+  'destroy',
+  'spend',
+];
+
+export interface ActionRiskAssessment {
+  riskLevel: 'low' | 'medium' | 'high';
+  requiredApprovalLevel: SupervisionPermissionLevel;
+  requiresExplicitApproval: boolean;
+  reasons: string[];
+}
 
 export class SupervisionService {
   private readonly controllerService: ControllerService;
@@ -213,6 +242,82 @@ export class SupervisionService {
     return this.getState();
   }
 
+  public async stopTask(): Promise<SupervisionState> {
+    this.aiPaused = true;
+    await this.controllerService.pause();
+    await this.controllerService.releaseAll();
+
+    const prisma = getPrismaClient();
+    const result = await prisma.supervisionQueueItem.updateMany({
+      where: { status: 'pending' },
+      data: {
+        status: 'blocked',
+        reviewedBy: 'human',
+        reviewNote: 'Dihentikan oleh Stop Task',
+      },
+    });
+
+    await this.logAudit(
+      'TASK_STOPPED',
+      'human',
+      `Task AI dihentikan oleh supervisor (${result.count} antrean pending dibatalkan)`,
+    );
+    return this.getState();
+  }
+
+  public assessActionRisk(
+    actionType: AIActionType,
+    target: string,
+    rationale: string,
+    confidence: number,
+  ): ActionRiskAssessment {
+    const reasons: string[] = [];
+    const normalizedText = `${target} ${rationale}`.toLowerCase();
+    const matchedKeywords = DESTRUCTIVE_KEYWORDS.filter((kw) =>
+      new RegExp(`\\b${kw}\\b`, 'i').test(normalizedText),
+    );
+
+    if (matchedKeywords.length > 0) {
+      reasons.push(`Mengandung aksi destruktif/sulit dibatalkan: ${matchedKeywords.join(', ')}`);
+      return {
+        riskLevel: 'high',
+        requiredApprovalLevel: 'L3',
+        requiresExplicitApproval: true,
+        reasons,
+      };
+    }
+
+    if (confidence < this.policy.minConfidenceL1) {
+      reasons.push(
+        `Confidence (${confidence.toFixed(2)}) di bawah ambang batas aman (${this.policy.minConfidenceL1.toFixed(2)})`,
+      );
+      return {
+        riskLevel: 'high',
+        requiredApprovalLevel: 'L3',
+        requiresExplicitApproval: true,
+        reasons,
+      };
+    }
+
+    if (LOW_RISK_ACTIONS.has(actionType)) {
+      reasons.push('Aksi observasi/navigasi berisiko rendah');
+      return {
+        riskLevel: 'low',
+        requiredApprovalLevel: 'L1',
+        requiresExplicitApproval: false,
+        reasons,
+      };
+    }
+
+    reasons.push(`Aksi ${actionType} memengaruhi objek/menu dan memerlukan pengawasan`);
+    return {
+      riskLevel: 'medium',
+      requiredApprovalLevel: 'L2',
+      requiresExplicitApproval: true,
+      reasons,
+    };
+  }
+
   private mapQueueRow(row: {
     id: number;
     actionType: string;
@@ -261,6 +366,8 @@ export class SupervisionService {
       this.policy.maxDurationMs,
     );
     const confidence = Math.min(Math.max(request.confidence, 0), 1);
+    const rationale = request.rationale ?? '';
+    const risk = this.assessActionRisk(request.actionType, request.target, rationale, confidence);
     const prisma = getPrismaClient();
 
     // Blocked immediately if Emergency Stop, Human Takeover, AI Paused, or L3 Human Only
@@ -277,7 +384,7 @@ export class SupervisionService {
           parametersJson: JSON.stringify(request.parameters ?? {}),
           durationMs,
           confidence,
-          rationale: request.rationale ?? '',
+          rationale,
           permissionLevel: this.permissionLevel,
           status: 'blocked',
           reviewedBy: 'system',
@@ -292,10 +399,12 @@ export class SupervisionService {
       return this.mapQueueRow(blocked);
     }
 
-    // L1 Auto Execute
+    // L1 Auto Execute: strictly restricted to low-risk actions with sufficient confidence
     if (
       this.permissionLevel === 'L1' &&
       this.policy.allowAutoExecuteL1 &&
+      risk.riskLevel === 'low' &&
+      !risk.requiresExplicitApproval &&
       confidence >= this.policy.minConfidenceL1
     ) {
       const execRes = await this.controllerService.executeAction({
@@ -313,7 +422,7 @@ export class SupervisionService {
           parametersJson: JSON.stringify(request.parameters ?? {}),
           durationMs,
           confidence,
-          rationale: request.rationale ?? '',
+          rationale,
           permissionLevel: 'L1',
           status: execRes.ok ? 'executed' : 'blocked',
           reviewedBy: 'auto-l1',
@@ -328,7 +437,7 @@ export class SupervisionService {
       return this.mapQueueRow(created);
     }
 
-    // L2 Approval Required (or L1 below confidence threshold)
+    // Mandatory human approval queue for L2, medium-risk, or high-risk destructive/uncertain actions
     const pending = await prisma.supervisionQueueItem.create({
       data: {
         actionType: request.actionType,
@@ -336,15 +445,16 @@ export class SupervisionService {
         parametersJson: JSON.stringify(request.parameters ?? {}),
         durationMs,
         confidence,
-        rationale: request.rationale ?? '',
+        rationale,
         permissionLevel: this.permissionLevel,
         status: 'pending',
+        reviewNote: risk.riskLevel === 'high' ? `[HIGH RISK] ${risk.reasons.join('; ')}` : null,
       },
     });
     await this.logAudit(
-      'ACTION_QUEUED',
+      risk.riskLevel === 'high' ? 'HIGH_RISK_ACTION_QUEUED' : 'ACTION_QUEUED',
       'ai',
-      `Aksi ${request.actionType} masuk antrean persetujuan (#${pending.id})`,
+      `Aksi ${request.actionType} (${risk.riskLevel} risk) masuk antrean persetujuan (#${pending.id})`,
     );
     return this.mapQueueRow(pending);
   }
