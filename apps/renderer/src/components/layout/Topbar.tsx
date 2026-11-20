@@ -1,5 +1,4 @@
 import {
-  Activity,
   Bell,
   Bot,
   ChevronRight,
@@ -11,7 +10,6 @@ import {
   RefreshCw,
   ShieldAlert,
   Sun,
-  Terminal,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { SupervisionState, SystemHealthResponse, SystemLogEntry } from '@ngegame/shared';
@@ -28,11 +26,9 @@ interface TopbarProps {
   logs: SystemLogEntry[];
   obsConnected: boolean;
   loading: boolean;
-  pinging: boolean;
   platform?: string;
   onSelectPage: (page: PageId) => void;
   onRefresh: () => void;
-  onPingWorker: () => void;
   onPauseOrResumeAI: () => void;
   onTakeoverOrReturn: () => void;
   onRequestEmergencyStop: () => void;
@@ -45,11 +41,9 @@ export function Topbar({
   logs,
   obsConnected,
   loading,
-  pinging,
   platform,
   onSelectPage,
   onRefresh,
-  onPingWorker,
   onPauseOrResumeAI,
   onTakeoverOrReturn,
   onRequestEmergencyStop,
@@ -59,7 +53,6 @@ export function Topbar({
 
   const current = NAV_ITEMS.find((item) => item.id === activePage);
   const isOnline = health?.components.backend.status === 'healthy';
-  const workerOnline = health?.components.pythonWorker.status === 'healthy';
   const isWindows = platform === 'win32';
   const platformLabel = isWindows ? 'Windows' : platform === 'darwin' ? 'macOS' : 'Desktop';
 
@@ -224,25 +217,6 @@ export function Topbar({
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)] disabled:opacity-50"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-
-        {/* Uji Worker dengan Animasi */}
-        <button
-          type="button"
-          onClick={onPingWorker}
-          disabled={loading || pinging}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--accent-primary)]/45 bg-[var(--accent-primary-soft)] px-2.5 text-xs font-semibold text-[var(--text-primary)] hover:opacity-90 disabled:opacity-50"
-        >
-          {pinging ? (
-            <Activity className="h-3.5 w-3.5 animate-pulse text-[var(--accent-primary)]" />
-          ) : (
-            <Terminal
-              className={`h-3.5 w-3.5 text-[var(--accent-primary)] ${
-                workerOnline ? 'animate-pulse' : ''
-              }`}
-            />
-          )}
-          <span className="hidden sm:inline">{pinging ? 'Menguji...' : 'Uji Worker'}</span>
         </button>
 
         {/* Live Badge di Pojok Kanan Atas */}

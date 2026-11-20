@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Camera, KeyRound, Mic, Play, RefreshCw, Square, Volume2, VolumeX } from 'lucide-react';
+import { Camera, ExternalLink, KeyRound, Mic, Play, RefreshCw, Square, Volume2, VolumeX } from 'lucide-react';
 import type {
   StreamingStatusResponse,
   StreamPlatform,
@@ -12,8 +12,18 @@ import { Panel } from '../components/ui/Panel.js';
 import { StatCard } from '../components/ui/StatCard.js';
 import { StatusBadge } from '../components/ui/StatusBadge.js';
 import { backendService } from '../services/backendService.js';
+import { GUIDE_URLS, parseFriendlyError } from '../utils/guideHelper.js';
 
-export function LiveStreamingPage(): React.JSX.Element {
+interface LiveStreamingPageProps {
+  onNotify?: (
+    message: string,
+    type?: 'info' | 'success' | 'error',
+    guideUrl?: string,
+    guideLabel?: string,
+  ) => void;
+}
+
+export function LiveStreamingPage({ onNotify }: LiveStreamingPageProps): React.JSX.Element {
   const [status, setStatus] = useState<StreamingStatusResponse | null>(null);
   const [voiceStatus, setVoiceStatus] = useState<VoiceServiceStatus | null>(null);
   const [obsUrl, setObsUrl] = useState('ws://localhost:4455');
@@ -23,6 +33,12 @@ export function LiveStreamingPage(): React.JSX.Element {
   const [twKey, setTwKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const reportError = (err: unknown, fallback: string): void => {
+    const friendly = parseFriendlyError(err, fallback);
+    setError(friendly.message);
+    onNotify?.(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
+  };
 
   const loadStatus = useCallback(async () => {
     setError(null);
@@ -34,7 +50,8 @@ export function LiveStreamingPage(): React.JSX.Element {
       setStatus(data);
       if (vStatus) setVoiceStatus(vStatus);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memuat status OBS & Siaran.');
+      const friendly = parseFriendlyError(err, 'Gagal memuat status OBS & Siaran.');
+      setError(friendly.message);
     }
   }, []);
 
@@ -56,8 +73,9 @@ export function LiveStreamingPage(): React.JSX.Element {
       setStatus(updated);
       if (platform === 'youtube') setYtKey('');
       else setTwKey('');
+      onNotify?.(`Kunci siaran ${platform === 'youtube' ? 'YouTube' : 'Twitch'} tersimpan aman.`, 'success');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan kunci siaran.');
+      reportError(err, 'Gagal menyimpan kunci siaran.');
     }
   };
 
@@ -69,8 +87,12 @@ export function LiveStreamingPage(): React.JSX.Element {
         ? await backendService.disconnectObs()
         : await backendService.connectObs({ url: obsUrl, password: obsPassword || undefined });
       setStatus(updated);
+      onNotify?.(
+        updated.obsConnected ? 'OBS Studio terhubung.' : 'Koneksi OBS Studio diputus.',
+        updated.obsConnected ? 'success' : 'info',
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menghubungkan OBS Studio.');
+      reportError(err, 'Gagal menghubungkan OBS Studio.');
     } finally {
       setLoading(false);
     }
@@ -78,13 +100,23 @@ export function LiveStreamingPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-base font-semibold text-[var(--text-primary)]">
-          Studio Siaran OBS &amp; Multistream
-        </h2>
-        <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-          Kendalikan OBS WebSocket v5, pratinjau adegan, pencampur audio, dan kunci siaran terenkripsi.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
+            Studio Siaran OBS &amp; Multistream
+          </h2>
+          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+            Kendalikan OBS WebSocket v5, pratinjau adegan, pencampur audio, dan kunci siaran terenkripsi.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void backendService.openExternalUrl(GUIDE_URLS.obs)}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Panduan Setup OBS &amp; Kunci Siaran
+        </button>
       </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -129,7 +161,14 @@ export function LiveStreamingPage(): React.JSX.Element {
         />
       </section>
 
-      {error && <ErrorState message={error} onRetry={() => void loadStatus()} />}
+      {error && (
+        <ErrorState
+          message={error}
+          guideUrl={GUIDE_URLS.obs}
+          guideLabel="Panduan OBS & Siaran"
+          onRetry={() => void loadStatus()}
+        />
+      )}
 
       {status?.lastError && (
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-500">
@@ -154,7 +193,12 @@ export function LiveStreamingPage(): React.JSX.Element {
               </button>
               <button
                 type="button"
-                onClick={() => void backendService.captureObsPreview().then(setStatus)}
+                onClick={() =>
+                  void backendService
+                    .captureObsPreview()
+                    .then(setStatus)
+                    .catch((e) => reportError(e, 'Gagal mengambil pratinjau OBS.'))
+                }
                 disabled={!status?.obsConnected}
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-40"
               >
@@ -163,7 +207,12 @@ export function LiveStreamingPage(): React.JSX.Element {
               {status?.health.streaming ? (
                 <button
                   type="button"
-                  onClick={() => void backendService.stopStreaming().then(setStatus)}
+                  onClick={() =>
+                    void backendService
+                      .stopStreaming()
+                      .then(setStatus)
+                      .catch((e) => reportError(e, 'Gagal menghentikan siaran.'))
+                  }
                   className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 text-xs font-medium text-rose-500"
                 >
                   <Square className="h-3.5 w-3.5" /> Hentikan Siaran
@@ -174,8 +223,11 @@ export function LiveStreamingPage(): React.JSX.Element {
                   onClick={() =>
                     void backendService
                       .startStreaming()
-                      .then(setStatus)
-                      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+                      .then((updated) => {
+                        setStatus(updated);
+                        onNotify?.('Siaran langsung dimulai.', 'success');
+                      })
+                      .catch((e) => reportError(e, 'Gagal memulai siaran.'))
                   }
                   className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 text-xs font-semibold text-emerald-500"
                 >

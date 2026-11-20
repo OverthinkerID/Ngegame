@@ -1,4 +1,4 @@
-name: Release Windows Installer
+name: Release Desktop Installers
 
 on:
   workflow_dispatch:
@@ -60,7 +60,7 @@ jobs:
       - name: Package Windows NSIS Installer
         run: npx electron-builder --win --x64 --publish never
 
-      - name: Generate SHA256 Checksums
+      - name: Generate Windows SHA256 Checksums
         shell: pwsh
         run: |
           Get-ChildItem release\*.exe, release\*.blockmap, release\latest.yml -ErrorAction SilentlyContinue |
@@ -80,15 +80,96 @@ jobs:
             release/SHA256SUMS.txt
           retention-days: 14
 
-      - name: Upload Draft Pre-Release (Tag only)
-        if: startsWith(github.ref, 'refs/tags/v')
+  build-macos:
+    name: Verify & Build macOS DMG & ZIP
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies & electron-builder
+        run: |
+          npm ci
+          npm install --no-save electron-builder
+
+      - name: Build shared package
+        run: npm run build -w @ngegame/shared
+
+      - name: Generate Prisma Client & Sync SQLite Schema
+        env:
+          DATABASE_URL: "file:./dev.db"
+        run: |
+          npm run db:generate
+          npm run db:push
+
+      - name: TypeScript check, Production Build, & Tests
+        env:
+          DATABASE_URL: "file:./dev.db"
+        run: |
+          npm run typecheck
+          npm run build
+          npm test
+
+      - name: Prepare Clean SQLite Template DB
+        env:
+          DATABASE_URL: "file:./template.sqlite"
+        run: npm run db:push
+
+      - name: Package macOS DMG & ZIP
+        run: npx electron-builder --mac --publish never
+
+      - name: Generate macOS SHA256 Checksums
+        run: |
+          cd release
+          shasum -a 256 *.dmg *.zip *.blockmap latest-mac.yml 2>/dev/null > SHA256SUMS-mac.txt || true
+
+      - name: Upload macOS Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-installer
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.blockmap
+            release/latest-mac.yml
+            release/SHA256SUMS-mac.txt
+          retention-days: 14
+
+  publish-release:
+    name: Upload Draft Pre-Release (Tag only)
+    needs: [build-windows, build-macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-nsis-installer
+          path: dist-release
+
+      - name: Download macOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-arm64-installer
+          path: dist-release
+
+      - name: Upload Draft Pre-Release
         uses: softprops/action-gh-release@v2
         with:
           draft: true
           prerelease: true
           generate_release_notes: true
-          files: |
-            release/*.exe
-            release/*.blockmap
-            release/latest.yml
-            release/SHA256SUMS.txt
+          files: dist-release/*

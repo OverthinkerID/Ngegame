@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type {
   AnalyticsSummaryReport,
   AppInfo,
+  SteamGameRecord,
   StreamingStatusResponse,
   SupervisionState,
   SystemHealthResponse,
@@ -29,6 +30,14 @@ import { VisionMonitorPage } from './pages/VisionMonitorPage.js';
 import { VoiceStudioPage } from './pages/VoiceStudioPage.js';
 import { backendService } from './services/backendService.js';
 import type { PageId } from './types/dashboard.js';
+import { parseFriendlyError } from './utils/guideHelper.js';
+
+interface ToastState {
+  message: string;
+  type: 'info' | 'success' | 'error';
+  guideUrl?: string;
+  guideLabel?: string;
+}
 
 function DashboardShell(): React.JSX.Element {
   const [activePage, setActivePage] = useState<PageId>('dashboard');
@@ -36,6 +45,7 @@ function DashboardShell(): React.JSX.Element {
   const [health, setHealth] = useState<SystemHealthResponse | null>(null);
   const [supervision, setSupervision] = useState<SupervisionState | null>(null);
   const [logs, setLogs] = useState<SystemLogEntry[]>([]);
+  const [scannedGames, setScannedGames] = useState<SteamGameRecord[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsSummaryReport | null>(null);
   const [streamingStatus, setStreamingStatus] = useState<StreamingStatusResponse | null>(null);
   const [lastPing, setLastPing] = useState<string | null>(null);
@@ -43,8 +53,18 @@ function DashboardShell(): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [pinging, setPinging] = useState(false);
   const [confirmEmergency, setConfirmEmergency] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(
-    null,
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  const showNotify = useCallback(
+    (
+      message: string,
+      type: 'info' | 'success' | 'error' = 'info',
+      guideUrl?: string,
+      guideLabel?: string,
+    ) => {
+      setToast({ message, type, guideUrl, guideLabel });
+    },
+    [],
   );
 
   const refreshBackendData = useCallback(async (silent = false) => {
@@ -54,27 +74,29 @@ function DashboardShell(): React.JSX.Element {
       const info = await backendService.getAppInfo().catch(() => null);
       if (info) setAppInfo(info);
 
-      const [healthData, recentLogs, summary, stream, sup] = await Promise.all([
+      const [healthData, recentLogs, summary, stream, sup, games] = await Promise.all([
         backendService.getHealth(),
         backendService.getRecentLogs(30),
         backendService.getAnalyticsSummary().catch(() => null),
         backendService.getStreamingStatus().catch(() => null),
         backendService.getSupervisionState().catch(() => null),
+        backendService.listSteamGames().catch(() => []),
       ]);
       setHealth(healthData);
       setLogs(recentLogs);
+      setScannedGames(games);
       if (summary) setAnalytics(summary);
       if (stream) setStreamingStatus(stream);
       if (sup) setSupervision(sup);
       if (!silent) {
-        setToast({ message: 'Status sistem berhasil diperbarui.', type: 'success' });
+        showNotify('Status sistem berhasil diperbarui.', 'success');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal terhubung ke layanan backend.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showNotify]);
 
   const handlePingWorker = async (): Promise<void> => {
     setPinging(true);
@@ -82,14 +104,25 @@ function DashboardShell(): React.JSX.Element {
     try {
       const res = await backendService.pingWorker();
       setLastPing(JSON.stringify(res, null, 2));
-      setToast({ message: 'Python Worker merespons dengan normal.', type: 'success' });
+      showNotify('Python Worker merespons dengan normal.', 'success');
       await refreshBackendData(true);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Gagal menghubungi Python Worker.';
-      setError(msg);
-      setToast({ message: msg, type: 'error' });
+      const friendly = parseFriendlyError(err, 'Gagal menghubungi Python Worker.');
+      setError(friendly.message);
+      showNotify(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
     } finally {
       setPinging(false);
+    }
+  };
+
+  const handleLaunchQuickGame = async (game: SteamGameRecord): Promise<void> => {
+    try {
+      const res = await backendService.launchSteamGame(game.appId);
+      showNotify(res.message, 'success');
+      await refreshBackendData(true);
+    } catch (err) {
+      const friendly = parseFriendlyError(err, `Gagal menjalankan ${game.name}.`);
+      showNotify(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
     }
   };
 
@@ -99,15 +132,10 @@ function DashboardShell(): React.JSX.Element {
         ? await backendService.resumeAI()
         : await backendService.pauseAI();
       setSupervision(updated);
-      setToast({
-        message: updated.aiPaused ? 'AI dijeda.' : 'AI dilanjutkan.',
-        type: 'info',
-      });
+      showNotify(updated.aiPaused ? 'AI dijeda.' : 'AI dilanjutkan.', 'info');
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Gagal mengubah status AI.',
-        type: 'error',
-      });
+      const friendly = parseFriendlyError(err, 'Gagal mengubah status AI.');
+      showNotify(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
     }
   };
 
@@ -118,18 +146,15 @@ function DashboardShell(): React.JSX.Element {
           ? await backendService.returnControlToAI()
           : await backendService.takeOverControl();
       setSupervision(updated);
-      setToast({
-        message:
-          updated.controlOwner === 'human'
-            ? 'Kendali diambil alih oleh manusia.'
-            : 'Kendali dikembalikan ke AI.',
-        type: 'success',
-      });
+      showNotify(
+        updated.controlOwner === 'human'
+          ? 'Kendali diambil alih oleh manusia.'
+          : 'Kendali dikembalikan ke AI.',
+        'success',
+      );
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : 'Gagal mengubah pemegang kendali.',
-        type: 'error',
-      });
+      const friendly = parseFriendlyError(err, 'Gagal mengubah pemegang kendali.');
+      showNotify(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
     }
   };
 
@@ -139,9 +164,12 @@ function DashboardShell(): React.JSX.Element {
 
   useEffect(() => {
     if (!toast) return;
-    const id = window.setTimeout(() => setToast(null), 3200);
+    const duration = toast.guideUrl ? 6500 : 3500;
+    const id = window.setTimeout(() => setToast(null), duration);
     return () => window.clearTimeout(id);
   }, [toast]);
+
+  const workerOnline = health?.components.pythonWorker.status === 'healthy';
 
   const renderPage = (): React.JSX.Element => {
     switch (activePage) {
@@ -155,21 +183,21 @@ function DashboardShell(): React.JSX.Element {
             streamingStatus={streamingStatus}
             lastPing={lastPing}
             onNavigate={setActivePage}
-            onNotify={(message, type = 'info') => setToast({ message, type })}
+            onNotify={(message, type = 'info') => showNotify(message, type)}
           />
         );
       case 'library':
-        return <GameLibraryPage />;
+        return <GameLibraryPage onNotify={showNotify} onGamesUpdated={setScannedGames} />;
       case 'ai-control':
-        return <AIControlPage />;
+        return <AIControlPage platform={appInfo?.platform} onNotify={showNotify} />;
       case 'vision':
         return <VisionMonitorPage />;
       case 'adapters':
         return <GameAdaptersPage />;
       case 'streaming':
-        return <LiveStreamingPage />;
+        return <LiveStreamingPage onNotify={showNotify} />;
       case 'voice':
-        return <VoiceStudioPage />;
+        return <VoiceStudioPage onNotify={showNotify} />;
       case 'analytics':
         return <AnalyticsPage />;
       case 'history':
@@ -190,7 +218,15 @@ function DashboardShell(): React.JSX.Element {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[var(--bg-main)] text-[var(--text-primary)]">
-      <Sidebar activePage={activePage} onSelectPage={setActivePage} />
+      <Sidebar
+        activePage={activePage}
+        scannedGames={scannedGames}
+        workerOnline={workerOnline}
+        pinging={pinging}
+        onSelectPage={setActivePage}
+        onPingWorker={() => void handlePingWorker()}
+        onLaunchQuickGame={(game) => void handleLaunchQuickGame(game)}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar
@@ -200,11 +236,9 @@ function DashboardShell(): React.JSX.Element {
           logs={logs}
           obsConnected={Boolean(streamingStatus?.obsConnected)}
           loading={loading}
-          pinging={pinging}
           platform={appInfo?.platform}
           onSelectPage={setActivePage}
           onRefresh={() => void refreshBackendData(false)}
-          onPingWorker={() => void handlePingWorker()}
           onPauseOrResumeAI={() => void handlePauseOrResumeAI()}
           onTakeoverOrReturn={() => void handleTakeoverOrReturn()}
           onRequestEmergencyStop={() => setConfirmEmergency(true)}
@@ -238,10 +272,7 @@ function DashboardShell(): React.JSX.Element {
           setConfirmEmergency(false);
           void backendService.supervisionEmergencyStop().then((updated) => {
             setSupervision(updated);
-            setToast({
-              message: 'Emergency Stop aktif. Semua input AI dihentikan.',
-              type: 'error',
-            });
+            showNotify('Emergency Stop aktif. Semua input AI dihentikan.', 'error');
           });
         }}
       />
@@ -249,6 +280,8 @@ function DashboardShell(): React.JSX.Element {
       <ToastNotification
         message={toast?.message ?? null}
         type={toast?.type}
+        guideUrl={toast?.guideUrl}
+        guideLabel={toast?.guideLabel}
         onClose={() => setToast(null)}
       />
     </div>

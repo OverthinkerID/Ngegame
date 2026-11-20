@@ -1,10 +1,12 @@
 import { History, Info, Moon, Palette, Shield, Sun } from 'lucide-react';
 import { useState } from 'react';
 import type { AppInfo, SystemLogEntry } from '@ngegame/shared';
+import { ObsLogo, SteamLogo, TwitchLogo, YouTubeLogo } from '../components/ui/BrandIcons.js';
 import { NgegameLogo } from '../components/ui/OverthinkerLogo.js';
 import { PageHeader } from '../components/ui/PageHeader.js';
 import { Panel } from '../components/ui/Panel.js';
 import { useTheme } from '../context/ThemeContext.js';
+import { backendService } from '../services/backendService.js';
 import type { PageId, ThemeAccent } from '../types/dashboard.js';
 import { SessionHistoryPage } from './SessionHistoryPage.js';
 
@@ -175,33 +177,108 @@ export function SettingsPage({
       {tab === 'about' && (
         <div className="space-y-6">
           <Panel
-            title="Tentang Overthinker-Ngegame"
-            subtitle="Identitas visual aplikasi dan informasi arsitektur desktop."
+            title="Tentang Ngegame (Overthinker-Ngegame)"
+            subtitle="Dikembangkan oleh Overthinker Studio — terbuka untuk kontribusi dan dukungan pengembangan."
           >
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-[#0B0D12] p-4">
-                <NgegameLogo className="h-11 w-11" withText={false} />
-                <div className="text-xs">
-                  <div className="font-semibold text-slate-100">Ikon Aplikasi (Gelap)</div>
-                  <div className="text-slate-400">Latar transparan</div>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+              <div className="space-y-3 lg:col-span-7">
+                <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+                  <strong>Ngegame</strong> (<em>Overthinker-Ngegame</em>) adalah pusat kendali AI gaming, pengamatan layar real-time, dan studio siaran langsung lintas platform (Windows &amp; macOS) yang dibangun oleh <strong>Overthinker Studio</strong>.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-[#0B0D12] p-3">
+                    <NgegameLogo className="h-9 w-9" withText={false} />
+                    <div className="text-xs">
+                      <div className="font-semibold text-slate-100">Ngegame (Gelap)</div>
+                      <div className="text-[11px] text-slate-400">Ikon utama</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                    <NgegameLogo className="h-9 w-11" withText={true} />
+                    <div className="text-xs">
+                      <div className="font-semibold text-slate-900">Ngegame (Terang)</div>
+                      <div className="text-[11px] text-slate-600">Kontras tinggi</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-[#0B0D12] p-4">
-                <NgegameLogo className="h-12 w-14" withText={true} />
-                <div className="text-xs">
-                  <div className="font-semibold text-slate-100">Logo &amp; Teks (Gelap)</div>
-                  <div className="text-slate-400">Identitas penuh</div>
+              <div className="flex flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 text-xs lg:col-span-5">
+                <div>
+                  <div className="font-semibold text-[var(--text-primary)]">
+                    Dukungan Pengembangan
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                    Proyek ini terus dikembangkan secara bertahap. Anda dapat mendukung dengan memberi Star di GitHub, melaporkan bug, atau berkontribusi langsung.
+                  </p>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void backendService.openExternalUrl(
+                        ['https:/', 'overthinkerid.github.io', 'Ngegame'].join('/') + '/',
+                      )
+                    }
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--accent-primary)]/45 bg-[var(--accent-primary-soft)] px-3 text-[11px] font-semibold text-[var(--text-primary)] hover:opacity-90"
+                  >
+                    Halaman Resmi &amp; Panduan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void backendService.openExternalUrl(
+                        ['https:/', 'github.com', 'OverthinkerID', 'Ngegame'].join('/'),
+                      )
+                    }
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]"
+                  >
+                    Dukung di GitHub
+                  </button>
                 </div>
               </div>
+            </div>
+          </Panel>
 
-              <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
-                <NgegameLogo className="h-12 w-14" withText={true} />
-                <div className="text-xs">
-                  <div className="font-semibold text-slate-900">Logo &amp; Teks (Terang)</div>
-                  <div className="text-slate-600">Kontras tinggi</div>
+          <Panel
+            title="Integrasi Pihak Ketiga &amp; Ekosistem"
+            subtitle="Perangkat lunak dan layanan resmi yang terhubung dengan Ngegame."
+          >
+            <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                {
+                  name: 'Steam Client',
+                  role: 'Pemindaian library lokal & peluncuran game',
+                  icon: <SteamLogo className="h-6 w-6 shrink-0" />,
+                },
+                {
+                  name: 'OBS Studio (WebSocket v5)',
+                  role: 'Kontrol adegan, pratinjau output, & siaran',
+                  icon: <ObsLogo className="h-6 w-6 shrink-0" />,
+                },
+                {
+                  name: 'YouTube Live',
+                  role: 'Target siaran & penyimpanan kunci terenkripsi',
+                  icon: <YouTubeLogo className="h-5 w-6 shrink-0" />,
+                },
+                {
+                  name: 'Twitch',
+                  role: 'Target multistream kedua',
+                  icon: <TwitchLogo className="h-6 w-6 shrink-0" />,
+                },
+              ].map((app) => (
+                <div
+                  key={app.name}
+                  className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3.5"
+                >
+                  {app.icon}
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[var(--text-primary)]">{app.name}</div>
+                    <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">{app.role}</div>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
           </Panel>
 
@@ -211,9 +288,10 @@ export function SettingsPage({
           >
             <div className="space-y-2 text-xs">
               {[
-                { label: 'Nama Produk', value: 'Overthinker-Ngegame' },
+                { label: 'Nama Produk', value: 'Ngegame (Overthinker-Ngegame)' },
+                { label: 'Pengembang', value: 'Overthinker Studio (OverthinkerID)' },
                 { label: 'Versi Rilis', value: appInfo?.version ?? '0.1.0' },
-                { label: 'Alamat Backend', value: appInfo?.backendUrl ?? 'http://localhost:47800' },
+                { label: 'Alamat Backend', value: appInfo?.backendUrl ?? 'http://127.0.0.1:47800' },
                 {
                   label: 'Platform Sistem',
                   value: appInfo ? `${appInfo.platform} (${appInfo.arch})` : 'Peramban Web',

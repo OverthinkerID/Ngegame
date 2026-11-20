@@ -1,5 +1,6 @@
-import { AlertTriangle, CheckCircle2, Inbox, Loader2, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Inbox, Loader2, X, XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { backendService } from '../../services/backendService.js';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -119,26 +120,42 @@ export function LoadingSkeleton({ rows = 3 }: { rows?: number }): React.JSX.Elem
 
 export function ErrorState({
   message,
+  guideUrl,
+  guideLabel = 'Buka Panduan',
   onRetry,
 }: {
   message: string;
+  guideUrl?: string;
+  guideLabel?: string;
   onRetry?: () => void;
 }): React.JSX.Element {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-xs text-rose-500">
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <XCircle className="h-4 w-4 shrink-0" />
-        <span>{message}</span>
+        <span className="break-words">{message}</span>
       </div>
-      {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-md border border-rose-500/40 px-2.5 py-1 text-[11px] font-semibold hover:bg-rose-500/15"
-        >
-          Coba Lagi
-        </button>
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {guideUrl && (
+          <button
+            type="button"
+            onClick={() => void backendService.openExternalUrl(guideUrl)}
+            className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold hover:bg-rose-500/20"
+          >
+            <ExternalLink className="h-3 w-3" />
+            {guideLabel}
+          </button>
+        )}
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-md border border-rose-500/40 px-2.5 py-1 text-[11px] font-semibold hover:bg-rose-500/15"
+          >
+            Coba Lagi
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -146,10 +163,14 @@ export function ErrorState({
 export function ToastNotification({
   message,
   type = 'info',
+  guideUrl,
+  guideLabel = 'Lihat Panduan',
   onClose,
 }: {
   message: string | null;
   type?: 'info' | 'success' | 'error';
+  guideUrl?: string;
+  guideLabel?: string;
   onClose: () => void;
 }): React.JSX.Element | null {
   if (!message) return null;
@@ -162,16 +183,32 @@ export function ToastNotification({
         : 'border-[var(--accent-primary)]/40 bg-[var(--bg-elevated)] text-[var(--text-primary)]';
 
   return (
-    <div className="fixed bottom-12 right-5 z-50 flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-xs font-medium shadow-xl">
-      <div className={`flex items-center gap-2 ${tone}`}>
-        <CheckCircle2 className="h-4 w-4 shrink-0" />
+    <div
+      className={`fixed bottom-12 right-5 z-50 flex max-w-md items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-xs font-medium shadow-xl ${tone}`}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {type === 'error' ? (
+          <XCircle className="h-4 w-4 shrink-0 text-rose-500" />
+        ) : (
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+        )}
         <span className="text-[var(--text-primary)]">{message}</span>
       </div>
+      {guideUrl && (
+        <button
+          type="button"
+          onClick={() => void backendService.openExternalUrl(guideUrl)}
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] font-semibold text-[var(--accent-primary)] hover:bg-[var(--surface-hover)]"
+        >
+          <ExternalLink className="h-3 w-3" />
+          {guideLabel}
+        </button>
+      )}
       <button
         type="button"
         onClick={onClose}
         aria-label="Tutup notifikasi"
-        className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+        className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
       >
         <X className="h-3.5 w-3.5" />
       </button>

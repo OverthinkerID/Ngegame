@@ -12,6 +12,7 @@ import { Panel } from '../components/ui/Panel.js';
 import { StatCard } from '../components/ui/StatCard.js';
 import { StatusBadge } from '../components/ui/StatusBadge.js';
 import { backendService } from '../services/backendService.js';
+import { GUIDE_URLS, parseFriendlyError } from '../utils/guideHelper.js';
 
 function formatBytes(bytes: number): string {
   if (!bytes || bytes <= 0) return '0 MB';
@@ -19,6 +20,10 @@ function formatBytes(bytes: number): string {
   if (gb >= 1) return `${gb.toFixed(2)} GB`;
   const mb = bytes / (1024 * 1024);
   return `${mb.toFixed(0)} MB`;
+}
+
+function steamHeaderUrl(appId: number): string {
+  return ['https:/', 'shared.fastly.steamstatic.com', 'store_item_assets', 'steam', 'apps', String(appId), 'header.jpg'].join('/');
 }
 
 const COMPAT_OPTIONS: SelectOption<'all' | SteamGameCompatibility>[] = [
@@ -29,14 +34,27 @@ const COMPAT_OPTIONS: SelectOption<'all' | SteamGameCompatibility>[] = [
   { value: 'unknown', label: 'Tidak Diketahui' },
 ];
 
-export function GameLibraryPage(): React.JSX.Element {
+interface GameLibraryPageProps {
+  onNotify?: (
+    message: string,
+    type?: 'info' | 'success' | 'error',
+    guideUrl?: string,
+    guideLabel?: string,
+  ) => void;
+  onGamesUpdated?: (games: SteamGameRecord[]) => void;
+}
+
+export function GameLibraryPage({
+  onNotify,
+  onGamesUpdated,
+}: GameLibraryPageProps): React.JSX.Element {
   const [status, setStatus] = useState<SteamInstallationStatus | null>(null);
   const [games, setGames] = useState<SteamGameRecord[]>([]);
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
   const [query, setQuery] = useState('');
   const [compatFilter, setCompatFilter] = useState<'all' | SteamGameCompatibility>('all');
   const [selectedGame, setSelectedGame] = useState<SteamGameRecord | null>(null);
   const [loading, setLoading] = useState(false);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadSteamData = useCallback(async () => {
@@ -49,12 +67,14 @@ export function GameLibraryPage(): React.JSX.Element {
       ]);
       setStatus(steamStatus);
       setGames(savedGames);
+      onGamesUpdated?.(savedGames);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memuat data Steam.');
+      const friendly = parseFriendlyError(err, 'Gagal memuat data Steam.');
+      setError(friendly.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onGamesUpdated]);
 
   useEffect(() => {
     void loadSteamData();
@@ -63,18 +83,25 @@ export function GameLibraryPage(): React.JSX.Element {
   const handleScan = async (): Promise<void> => {
     setLoading(true);
     setError(null);
-    setActionMessage(null);
     try {
       const res = await backendService.scanSteamLibrary();
       setStatus(res.installation);
       setGames(res.games);
-      setActionMessage(
-        res.installation.installed
-          ? `Pemindaian selesai: ${res.games.length} game disimpan ke SQLite.`
-          : 'Instalasi Steam belum terdeteksi di sistem ini.',
-      );
+      onGamesUpdated?.(res.games);
+      if (res.installation.installed) {
+        onNotify?.(`Pemindaian selesai: ${res.games.length} game disimpan ke SQLite.`, 'success');
+      } else {
+        onNotify?.(
+          'Instalasi Steam belum terdeteksi di sistem ini.',
+          'error',
+          GUIDE_URLS.steam,
+          'Panduan Steam',
+        );
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memindai pustaka Steam.');
+      const friendly = parseFriendlyError(err, 'Gagal memindai pustaka Steam.');
+      setError(friendly.message);
+      onNotify?.(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
     } finally {
       setLoading(false);
     }
@@ -82,25 +109,27 @@ export function GameLibraryPage(): React.JSX.Element {
 
   const handleLaunch = async (game: SteamGameRecord): Promise<void> => {
     setError(null);
-    setActionMessage(null);
     try {
       const res = await backendService.launchSteamGame(game.appId);
-      setActionMessage(res.message);
+      onNotify?.(res.message, 'success');
       await loadSteamData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Gagal menjalankan ${game.name}`);
+      const friendly = parseFriendlyError(err, `Gagal menjalankan ${game.name}`);
+      setError(friendly.message);
+      onNotify?.(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
     }
   };
 
   const handleStop = async (game: SteamGameRecord): Promise<void> => {
     setError(null);
-    setActionMessage(null);
     try {
       const res = await backendService.stopSteamGame(game.appId);
-      setActionMessage(res.message);
+      onNotify?.(res.message, 'info');
       await loadSteamData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Gagal menghentikan ${game.name}`);
+      const friendly = parseFriendlyError(err, `Gagal menghentikan ${game.name}`);
+      setError(friendly.message);
+      onNotify?.(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
     }
   };
 
@@ -147,12 +176,13 @@ export function GameLibraryPage(): React.JSX.Element {
         />
       </section>
 
-      {error && <ErrorState message={error} onRetry={() => void loadSteamData()} />}
-
-      {actionMessage && (
-        <div className="rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-500">
-          {actionMessage}
-        </div>
+      {error && (
+        <ErrorState
+          message={error}
+          guideUrl={GUIDE_URLS.steam}
+          guideLabel="Panduan Steam"
+          onRetry={() => void loadSteamData()}
+        />
       )}
 
       <Panel
@@ -205,19 +235,28 @@ export function GameLibraryPage(): React.JSX.Element {
             {filtered.map((game) => (
               <article
                 key={game.appId}
-                className="flex flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4"
+                className="flex flex-col justify-between overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
               >
                 <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                        {game.name}
-                      </h3>
-                      <p className="mt-0.5 tabular-nums text-xs text-[var(--text-secondary)]">
-                        AppID {game.appId} • {formatBytes(game.sizeOnDiskBytes)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
+                  {/* Artwork Header Steam dengan fallback ikon */}
+                  <div className="relative h-32 w-full overflow-hidden border-b border-[var(--border-subtle)] bg-[var(--bg-main)]">
+                    {!failedImages[game.appId] ? (
+                      <img
+                        src={steamHeaderUrl(game.appId)}
+                        alt={game.name}
+                        loading="lazy"
+                        onError={() =>
+                          setFailedImages((prev) => ({ ...prev, [game.appId]: true }))
+                        }
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center gap-2 text-xs text-[var(--text-muted)]">
+                        <SteamLogo className="h-7 w-7 opacity-80" />
+                        <span>{game.name}</span>
+                      </div>
+                    )}
+                    <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5">
                       {game.isRunning && (
                         <StatusBadge
                           variant="healthy"
@@ -240,12 +279,20 @@ export function GameLibraryPage(): React.JSX.Element {
                     </div>
                   </div>
 
-                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                    {game.compatibilityReason}
-                  </p>
+                  <div className="p-4 pb-2">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                      {game.name}
+                    </h3>
+                    <p className="mt-0.5 tabular-nums text-xs text-[var(--text-secondary)]">
+                      AppID {game.appId} • {formatBytes(game.sizeOnDiskBytes)}
+                    </p>
+                    <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                      {game.compatibilityReason}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-3">
+                <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] px-4 py-3">
                   <button
                     type="button"
                     onClick={() => setSelectedGame(game)}

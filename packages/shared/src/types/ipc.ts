@@ -59,6 +59,7 @@ export type { ResourceMetricsSnapshot };
 
 export const IPC_CHANNELS = {
   APP_GET_INFO: 'app:get-info',
+  APP_OPEN_EXTERNAL: 'app:open-external',
   BACKEND_HEALTH: 'backend:health',
   BACKEND_LOGS: 'backend:logs',
   WORKER_PING: 'worker:ping',
@@ -138,6 +139,7 @@ export interface AppInfo {
 
 export interface NgegameBridgeAPI {
   getAppInfo: () => Promise<AppInfo>;
+  openExternalUrl: (url: string) => Promise<void>;
   getBackendHealth: () => Promise<SystemHealthResponse>;
   getRecentLogs: (limit?: number) => Promise<SystemLogEntry[]>;
   pingPythonWorker: () => Promise<WorkerResponse>;
