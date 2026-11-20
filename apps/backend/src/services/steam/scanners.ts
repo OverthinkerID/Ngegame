@@ -115,15 +115,15 @@ export class MacOSSteamScanner implements PlatformSteamScanner {
     if (this.customSteamPath) {
       candidates.add(this.customSteamPath);
     }
-    candidates.add(path.join(os.homedir(), 'Library', 'Application Support', 'Steam'));
+    candidates.add(path.posix.join(os.homedir().replace(/\\/g, '/'), 'Library', 'Application Support', 'Steam'));
     candidates.add('/Applications/Steam.app');
 
     // Periksa volume eksternal jika Steam library berada di SSD eksternal
     try {
       const volumes = await fs.readdir('/Volumes');
       for (const vol of volumes) {
-        candidates.add(path.join('/Volumes', vol, 'Steam'));
-        candidates.add(path.join('/Volumes', vol, 'SteamLibrary'));
+        candidates.add(path.posix.join('/Volumes', vol, 'Steam'));
+        candidates.add(path.posix.join('/Volumes', vol, 'SteamLibrary'));
       }
     } catch {
       // Abaikan jika /Volumes tidak terbaca
@@ -158,10 +158,11 @@ export class LinuxSteamScanner implements PlatformSteamScanner {
     if (this.customSteamPath) {
       candidates.add(this.customSteamPath);
     }
-    candidates.add(path.join(os.homedir(), '.local', 'share', 'Steam'));
-    candidates.add(path.join(os.homedir(), '.steam', 'steam'));
+    const posixHome = os.homedir().replace(/\\/g, '/');
+    candidates.add(path.posix.join(posixHome, '.local', 'share', 'Steam'));
+    candidates.add(path.posix.join(posixHome, '.steam', 'steam'));
     candidates.add(
-      path.join(os.homedir(), '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam'),
+      path.posix.join(posixHome, '.var', 'app', 'com.valvesoftware.Steam', '.local', 'share', 'Steam'),
     );
 
     return {
