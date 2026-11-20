@@ -24,8 +24,11 @@ files:
   - packages/shared/dist/**/*
   - packages/shared/package.json
   - node_modules/**/*
-  - node_modules/.prisma/**/*
   - node_modules/@prisma/**/*
+  - from: node_modules/.prisma
+    to: node_modules/.prisma
+    filter:
+      - "**/*"
   - "!node_modules/@ngegame/**"
   - from: packages/shared
     to: node_modules/@ngegame/shared
