@@ -14,6 +14,7 @@ import {
   Radio,
   RefreshCw,
   Settings,
+  Sliders,
   Terminal,
   type LucideIcon,
 } from 'lucide-react';
@@ -30,6 +31,7 @@ const ICON_MAP: Record<PageId, LucideIcon> = {
   'ai-control': Bot,
   vision: Eye,
   adapters: Puzzle,
+  'adaptation-studio': Sliders,
   streaming: LayoutDashboard,
   voice: Mic,
   analytics: Activity,
@@ -40,7 +42,7 @@ const ICON_MAP: Record<PageId, LucideIcon> = {
 
 const NAV_GROUPS: { label: string; ids: PageId[] }[] = [
   { label: 'Utama', ids: ['dashboard', 'library'] },
-  { label: 'AI & Visi', ids: ['ai-control', 'vision', 'adapters'] },
+  { label: 'AI & Visi', ids: ['ai-control', 'vision', 'adapters', 'adaptation-studio'] },
   { label: 'Studio', ids: ['streaming', 'voice'] },
   { label: 'Sistem', ids: ['analytics', 'history', 'system-monitor', 'settings'] },
 ];

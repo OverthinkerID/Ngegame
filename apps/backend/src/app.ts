@@ -4,6 +4,7 @@ import express, { type Express } from 'express';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { BackendEnvConfig } from './config/env.js';
 import { globalErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { createAdaptationRouter } from './routes/adaptationRoutes.js';
 import { createAdapterRouter } from './routes/adapterRoutes.js';
 import { createAIRouter } from './routes/aiRoutes.js';
 import { createAnalyticsRouter } from './routes/analyticsRoutes.js';
@@ -15,7 +16,13 @@ import { createSupervisionRouter } from './routes/supervisionRoutes.js';
 import { createSystemRouter } from './routes/systemRoutes.js';
 import { createVisionRouter } from './routes/visionRoutes.js';
 import { createVoiceRouter } from './routes/voiceRoutes.js';
+import { CalibrationService } from './services/adaptation/calibrationService.js';
+import { GameBrainService } from './services/adaptation/gameBrainService.js';
+import { GameProfileManager } from './services/adaptation/gameProfileManager.js';
+import { PipelineDiagnosticsService } from './services/adaptation/pipelineDiagnostics.js';
+import { AIBrainService } from './services/ai/aiBrainService.js';
 import { ControllerService } from './services/controller/controllerService.js';
+import { SteamManager } from './services/steam/steamManager.js';
 import { SupervisionService } from './services/supervision/supervisionService.js';
 import { VisionService } from './services/vision/visionService.js';
 import { Logger } from './utils/logger.js';
@@ -106,9 +113,32 @@ export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
 
   const controllerService = new ControllerService(workerClient);
   const supervisionService = new SupervisionService(controllerService);
+  const steamManager = new SteamManager();
+  const aiBrainService = new AIBrainService();
+  const profileManager = new GameProfileManager();
+  const diagnosticsService = new PipelineDiagnosticsService(
+    steamManager,
+    visionService,
+    aiBrainService,
+    controllerService,
+  );
+  const gameBrainService = new GameBrainService(
+    profileManager,
+    visionService,
+    aiBrainService,
+    controllerService,
+    supervisionService,
+  );
+  const calibrationService = new CalibrationService(
+    profileManager,
+    steamManager,
+    visionService,
+    controllerService,
+    aiBrainService,
+  );
 
   app.use('/api', createHealthRouter(workerClient, '0.1.0'));
-  app.use('/api/steam', createSteamRouter());
+  app.use('/api/steam', createSteamRouter(steamManager));
   app.use('/api/vision', createVisionRouter(visionService));
   app.use('/api/ai', createAIRouter());
   app.use('/api/controller', createControllerRouter(controllerService));
@@ -118,6 +148,16 @@ export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
   app.use('/api/streaming', createStreamingRouter());
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/system', createSystemRouter());
+  app.use(
+    '/api/adaptation',
+    createAdaptationRouter({
+      profileManager,
+      diagnosticsService,
+      gameBrainService,
+      calibrationService,
+      steamManager,
+    }),
+  );
   app.use(notFoundHandler);
   app.use(globalErrorHandler);
 
