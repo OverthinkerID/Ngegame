@@ -1,4 +1,5 @@
 import platform
+import re
 import subprocess
 from typing import Any, Dict, List
 
@@ -10,6 +11,51 @@ def list_visible_windows() -> List[Dict[str, Any]]:
     if system == "Windows":
         return _list_windows_win32()
     return []
+
+
+def _list_macos_lsappinfo() -> List[Dict[str, Any]]:
+    try:
+        front_asn = ""
+        front_res = subprocess.run(
+            ["lsappinfo", "front"],
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+            check=False,
+        )
+        if front_res.returncode == 0:
+            front_asn = front_res.stdout.strip()
+
+        vis_res = subprocess.run(
+            ["lsappinfo", "visibleProcessList"],
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+            check=False,
+        )
+        if vis_res.returncode != 0 or not vis_res.stdout.strip():
+            return []
+
+        windows: List[Dict[str, Any]] = []
+        for idx, match in enumerate(
+            re.finditer(r'(ASN:[^\s"]+)-"([^"]+)"', vis_res.stdout)
+        ):
+            asn = match.group(1)
+            raw_name = match.group(2).replace("_", " ").strip()
+            if not raw_name:
+                continue
+            windows.append(
+                {
+                    "id": f"mac-ls-{idx}",
+                    "title": raw_name,
+                    "owner": raw_name,
+                    "focused": bool(front_asn and asn == front_asn),
+                }
+            )
+        windows.sort(key=lambda w: (0 if w.get("focused") else 1))
+        return windows
+    except Exception:
+        return []
 
 
 def _list_macos_windows() -> List[Dict[str, Any]]:
@@ -41,32 +87,38 @@ def _list_macos_windows() -> List[Dict[str, Any]]:
             ["osascript", "-e", script],
             capture_output=True,
             text=True,
-            timeout=3,
+            timeout=1.2,
             check=False,
         )
-        if completed.returncode != 0 or not completed.stdout.strip():
-            return []
-        windows: List[Dict[str, Any]] = []
-        raw_items = completed.stdout.strip().split(", ")
-        for idx, item in enumerate(raw_items):
-            parts = item.split("||")
-            is_front = parts[0].strip() == "1" if len(parts) > 0 else False
-            owner = parts[1].strip() if len(parts) > 1 else "Unknown"
-            title = parts[2].strip() if len(parts) > 2 and parts[2].strip() else owner
-            pid = int(parts[3].strip()) if len(parts) > 3 and parts[3].strip().isdigit() else None
-            windows.append(
-                {
-                    "id": f"mac-{idx}-{pid or 0}",
-                    "title": title,
-                    "owner": owner,
-                    "focused": is_front,
-                    **({"pid": pid} if pid is not None else {}),
-                }
-            )
-        windows.sort(key=lambda w: (0 if w.get("focused") else 1))
-        return windows
+        if completed.returncode == 0 and completed.stdout.strip():
+            windows: List[Dict[str, Any]] = []
+            raw_items = completed.stdout.strip().split(", ")
+            for idx, item in enumerate(raw_items):
+                parts = item.split("||")
+                is_front = parts[0].strip() == "1" if len(parts) > 0 else False
+                owner = parts[1].strip() if len(parts) > 1 else "Unknown"
+                title = parts[2].strip() if len(parts) > 2 and parts[2].strip() else owner
+                pid = (
+                    int(parts[3].strip())
+                    if len(parts) > 3 and parts[3].strip().isdigit()
+                    else None
+                )
+                windows.append(
+                    {
+                        "id": f"mac-{idx}-{pid or 0}",
+                        "title": title,
+                        "owner": owner,
+                        "focused": is_front,
+                        **({"pid": pid} if pid is not None else {}),
+                    }
+                )
+            if windows:
+                windows.sort(key=lambda w: (0 if w.get("focused") else 1))
+                return windows
     except Exception:
-        return []
+        pass
+
+    return _list_macos_lsappinfo()
 
 
 def _list_windows_win32() -> List[Dict[str, Any]]:
