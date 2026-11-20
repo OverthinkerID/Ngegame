@@ -12,6 +12,9 @@ const api: NgegameBridgeAPI = {
   scanSteamLibrary: () => ipcRenderer.invoke('steam:scan'),
   launchSteamGame: (appId: number) => ipcRenderer.invoke('steam:launch', appId),
   stopSteamGame: (appId: number) => ipcRenderer.invoke('steam:stop', appId),
+  getManualSteamLibraries: () => ipcRenderer.invoke('steam:manual-libs-list'),
+  addManualSteamLibrary: (libraryPath: string) => ipcRenderer.invoke('steam:manual-libs-add', libraryPath),
+  removeManualSteamLibrary: (libraryPath: string) => ipcRenderer.invoke('steam:manual-libs-remove', libraryPath),
   getVisionStatus: () => ipcRenderer.invoke('vision:status'),
   listVisionWindows: () => ipcRenderer.invoke('vision:windows'),
   captureVisionOnce: (options) => ipcRenderer.invoke('vision:capture-once', options),
@@ -69,6 +72,25 @@ const api: NgegameBridgeAPI = {
   getThrottlingConfig: () => ipcRenderer.invoke('analytics:throttle-get'),
   updateThrottlingConfig: (partial) => ipcRenderer.invoke('analytics:throttle-update', partial),
   exportAnalyticsReport: (format) => ipcRenderer.invoke('analytics:export', format),
+  getAdaptationDiagnostics: () => ipcRenderer.invoke('adaptation:diagnostics'),
+  getSteamDiagnostics: () => ipcRenderer.invoke('adaptation:steam-diagnostics'),
+  listGameProfiles: () => ipcRenderer.invoke('adaptation:profiles-list'),
+  getGameProfile: (gameId) => ipcRenderer.invoke('adaptation:profile-get', gameId),
+  saveGameProfile: (profile) => ipcRenderer.invoke('adaptation:profile-save', profile),
+  resetGameProfile: (gameId) => ipcRenderer.invoke('adaptation:profile-reset', gameId),
+  importGameProfile: (json) => ipcRenderer.invoke('adaptation:profile-import', json),
+  exportGameProfile: (gameId) => ipcRenderer.invoke('adaptation:profile-export', gameId),
+  duplicateGameProfile: (sourceGameId, newGameId, newGameName) =>
+    ipcRenderer.invoke('adaptation:profile-duplicate', sourceGameId, newGameId, newGameName),
+  deleteGameProfile: (gameId) => ipcRenderer.invoke('adaptation:profile-delete', gameId),
+  getGameProfileHistory: (gameId, limit = 25) =>
+    ipcRenderer.invoke('adaptation:profile-history', gameId, limit),
+  runGameBrainCycle: (req) => ipcRenderer.invoke('adaptation:brain-cycle', req),
+  listGameMemories: (gameId, limit = 30) => ipcRenderer.invoke('adaptation:memory-list', gameId, limit),
+  clearGameMemories: (gameId) => ipcRenderer.invoke('adaptation:memory-clear', gameId),
+  getCalibrationState: (gameId) => ipcRenderer.invoke('adaptation:calibration-get', gameId),
+  runCalibrationStep: (gameId, step) => ipcRenderer.invoke('adaptation:calibration-step', gameId, step),
+  getStardewCapabilities: (level = 1) => ipcRenderer.invoke('adaptation:stardew-caps', level),
 };
 
 contextBridge.exposeInMainWorld('ngegameAPI', api);

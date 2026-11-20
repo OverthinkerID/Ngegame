@@ -17,6 +17,7 @@ import type {
   AIBrainDecisionResult,
   AnalyticsSummaryReport,
   AppInfo,
+  ControllerExecutionResult,
   SteamGameRecord,
   StreamingStatusResponse,
   SupervisionState,
@@ -56,24 +57,30 @@ export function MainDashboardPage({
 }: MainDashboardPageProps): React.JSX.Element {
   const [supervision, setSupervision] = useState<SupervisionState | null>(null);
   const [aiHistory, setAiHistory] = useState<AIBrainDecisionResult[]>([]);
+  const [actionHistory, setActionHistory] = useState<ControllerExecutionResult[]>([]);
   const [visionStatus, setVisionStatus] = useState<VisionMonitorStatus | null>(null);
   const [latestFrame, setLatestFrame] = useState<VisionAnalysisResult | null>(null);
   const [runningGame, setRunningGame] = useState<SteamGameRecord | null>(null);
+  const [runtimeStatus, setRuntimeStatus] = useState<Awaited<ReturnType<typeof backendService.getRuntimeStatus>> | null>(null);
   const [confirmEmergency, setConfirmEmergency] = useState(false);
 
   const loadDashboardLive = useCallback(async () => {
-    const [sup, aiHist, vStat, vHist, games] = await Promise.all([
+    const [sup, aiHist, actHist, vStat, vHist, games, rt] = await Promise.all([
       backendService.getSupervisionState().catch(() => null),
       backendService.getAIHistory(5).catch(() => []),
+      backendService.getControllerHistory(5).catch(() => []),
       backendService.getVisionStatus().catch(() => null),
       backendService.getVisionHistory(1).catch(() => []),
       backendService.listSteamGames().catch(() => []),
+      backendService.getRuntimeStatus().catch(() => null),
     ]);
     if (sup) setSupervision(sup);
     setAiHistory(aiHist);
+    setActionHistory(actHist);
     if (vStat) setVisionStatus(vStat);
     setLatestFrame(vHist[0] ?? null);
     setRunningGame(games.find((g) => g.isRunning) ?? null);
+    if (rt) setRuntimeStatus(rt);
   }, []);
 
   useEffect(() => {
@@ -240,6 +247,36 @@ export function MainDashboardPage({
               label={visionStatus?.running ? 'Memantau' : 'Nonaktif'}
             />
           }
+        />
+      </section>
+
+      {/* Status Runtime, AI Provider, Controller & Antrean Aktual */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Sesi & Tugas AI"
+          value={runtimeStatus?.activeSession ? `#${runtimeStatus.activeSession.id} (${runtimeStatus.phase})` : 'Siaga'}
+          meta={runtimeStatus?.currentTask ?? 'Belum ada tugas AI aktif'}
+        />
+        <StatCard
+          label="State Game & Provider"
+          value={runtimeStatus?.gameState ?? 'unknown'}
+          meta={
+            runtimeStatus?.aiProviderHealth?.ollamaAvailable
+              ? 'Provider: Ollama Lokal'
+              : runtimeStatus?.aiProviderHealth?.openaiConfigured
+                ? 'Provider: OpenAI Cloud'
+                : 'Provider: Fallback Heuristik'
+          }
+        />
+        <StatCard
+          label="Status Controller"
+          value={runtimeStatus?.controllerStatus?.paused ? 'Dijeda' : runtimeStatus?.controllerStatus?.dryRun ? 'Simulasi (Dry-Run)' : 'Siap'}
+          meta={`Backend: ${runtimeStatus?.controllerStatus?.backend ?? 'python-worker'}`}
+        />
+        <StatCard
+          label="Antrean & Riwayat Aksi"
+          value={`${supervision?.pendingCount ?? 0} menunggu`}
+          meta={`${actionHistory.length} aksi controller terbaru tercatat`}
         />
       </section>
 

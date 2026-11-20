@@ -16,6 +16,7 @@ import {
 import { getPrismaClient, recordSystemLog } from '../../db/prisma.js';
 import { Logger } from '../../utils/logger.js';
 import { assessGameCompatibility } from './compatibility.js';
+import { createSteamScanner, type PlatformSteamScanner } from './scanners.js';
 import { parseVdf, type VdfObject } from './vdfParser.js';
 
 const execFileAsync = promisify(execFile);
@@ -46,50 +47,112 @@ async function pathExists(targetPath: string): Promise<boolean> {
 export class SteamManager {
   private readonly logger: Logger;
   private readonly customSteamPath?: string;
+  private readonly scanner: PlatformSteamScanner;
+  private lastDiagnostics: import('@ngegame/shared').SteamScannerDiagnostics | null = null;
 
-  constructor(options?: { steamPath?: string; logger?: Logger }) {
+  constructor(options?: { steamPath?: string; logger?: Logger; scanner?: PlatformSteamScanner }) {
     this.customSteamPath = options?.steamPath ?? process.env.STEAM_PATH;
     this.logger = options?.logger ?? new Logger('steam-manager');
+    this.scanner = options?.scanner ?? createSteamScanner(process.platform, this.customSteamPath);
   }
 
-  private getCandidateSteamPaths(): string[] {
-    const candidates: string[] = [];
-    if (this.customSteamPath) {
-      candidates.push(this.customSteamPath);
-    }
+  public getDiagnostics(): import('@ngegame/shared').SteamScannerDiagnostics | null {
+    return this.lastDiagnostics;
+  }
 
-    if (process.platform === 'darwin') {
-      candidates.push(
-        path.join(os.homedir(), 'Library', 'Application Support', 'Steam'),
-        '/Applications/Steam.app',
-      );
-    } else if (process.platform === 'win32') {
-      candidates.push(
-        'C:\\Program Files (x86)\\Steam',
-        'C:\\Program Files\\Steam',
-      );
-    } else {
-      candidates.push(
-        path.join(os.homedir(), '.local', 'share', 'Steam'),
-        path.join(os.homedir(), '.steam', 'steam'),
+  public async getManualLibraryPaths(): Promise<string[]> {
+    const prisma = getPrismaClient();
+    const row = await prisma.appSetting.findUnique({
+      where: { key: 'steam_manual_libraries' },
+    });
+    if (!row?.value) return [];
+    try {
+      const parsed = JSON.parse(row.value) as unknown;
+      return Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public async addManualLibraryPath(rawPath: string): Promise<string[]> {
+    const normalized = this.scanner.normalizeLibraryPath(rawPath);
+    if (!normalized) {
+      throw new AppError('Path pustaka Steam tidak boleh kosong.', ErrorCode.VALIDATION_ERROR, 400);
+    }
+    const steamAppsDir = path.join(normalized, 'steamapps');
+    if (!(await pathExists(normalized)) || !(await pathExists(steamAppsDir))) {
+      throw new AppError(
+        `Folder '${normalized}' tidak valid atau tidak memiliki subdirektori steamapps/.`,
+        ErrorCode.VALIDATION_ERROR,
+        400,
       );
     }
+    const current = await this.getManualLibraryPaths();
+    const updated = Array.from(new Set([...current, normalized]));
+    const prisma = getPrismaClient();
+    await prisma.appSetting.upsert({
+      where: { key: 'steam_manual_libraries' },
+      create: { key: 'steam_manual_libraries', value: JSON.stringify(updated) },
+      update: { value: JSON.stringify(updated) },
+    });
+    await recordSystemLog('info', 'steam', `Lokasi pustaka manual ditambahkan: ${normalized}`);
+    return updated;
+  }
 
-    return candidates;
+  public async removeManualLibraryPath(rawPath: string): Promise<string[]> {
+    const normalized = this.scanner.normalizeLibraryPath(rawPath);
+    const current = await this.getManualLibraryPaths();
+    const updated = current.filter((p) => p !== normalized && p !== rawPath);
+    const prisma = getPrismaClient();
+    await prisma.appSetting.upsert({
+      where: { key: 'steam_manual_libraries' },
+      create: { key: 'steam_manual_libraries', value: JSON.stringify(updated) },
+      update: { value: JSON.stringify(updated) },
+    });
+    return updated;
   }
 
   public async detectInstallation(): Promise<SteamInstallationStatus> {
     const checkedAt = new Date().toISOString();
+    const { candidates, registryQueried, registrySteamPath } =
+      await this.scanner.getCandidateSteamPaths();
     let foundSteamPath: string | null = null;
+    const permissionWarnings: string[] = [];
 
-    for (const candidate of this.getCandidateSteamPaths()) {
-      if (await pathExists(candidate)) {
+    for (const candidate of candidates) {
+      try {
+        await fs.access(candidate);
         foundSteamPath = candidate;
         break;
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'EACCES' || code === 'EPERM') {
+          permissionWarnings.push(`Akses ditolak saat memeriksa ${candidate}`);
+        }
       }
     }
 
-    if (!foundSteamPath) {
+    const manualLibraries = await this.getManualLibraryPaths();
+
+    if (!foundSteamPath && manualLibraries.length === 0) {
+      this.lastDiagnostics = {
+        scannerName: this.scanner.scannerName,
+        platform: process.platform,
+        candidatePathsChecked: candidates,
+        registryQueried,
+        registrySteamPath,
+        librariesFound: [],
+        manifestsParsed: 0,
+        staleManifests: [],
+        permissionWarnings,
+        progress: {
+          stage: 'completed',
+          percent: 100,
+          message: 'Instalasi Steam tidak ditemukan di jalur kandidat.',
+        },
+      };
       return {
         installed: false,
         steamPath: null,
@@ -99,7 +162,27 @@ export class SteamManager {
       };
     }
 
-    const libraryPaths = await this.readLibraryFolders(foundSteamPath);
+    const libraryPaths = await this.readLibraryFolders(
+      foundSteamPath ?? manualLibraries[0]!,
+      permissionWarnings,
+      manualLibraries,
+    );
+    this.lastDiagnostics = {
+      scannerName: this.scanner.scannerName,
+      platform: process.platform,
+      candidatePathsChecked: candidates,
+      registryQueried,
+      registrySteamPath,
+      librariesFound: libraryPaths,
+      manifestsParsed: this.lastDiagnostics?.manifestsParsed ?? 0,
+      staleManifests: this.lastDiagnostics?.staleManifests ?? [],
+      permissionWarnings,
+      progress: {
+        stage: 'reading_libraries',
+        percent: 45,
+        message: `${libraryPaths.length} direktori pustaka Steam ditemukan.`,
+      },
+    };
     return {
       installed: true,
       steamPath: foundSteamPath,
@@ -109,11 +192,20 @@ export class SteamManager {
     };
   }
 
-  private async readLibraryFolders(steamPath: string): Promise<string[]> {
+  private async readLibraryFolders(
+    steamPath: string,
+    permissionWarnings: string[] = [],
+    manualLibraries: string[] = [],
+  ): Promise<string[]> {
     const libraries = new Set<string>();
     const defaultSteamApps = path.join(steamPath, 'steamapps');
     if (await pathExists(defaultSteamApps)) {
       libraries.add(steamPath);
+    }
+    for (const manual of manualLibraries) {
+      if (await pathExists(path.join(manual, 'steamapps'))) {
+        libraries.add(manual);
+      }
     }
 
     const vdfPath = path.join(steamPath, 'steamapps', 'libraryfolders.vdf');
@@ -128,16 +220,18 @@ export class SteamManager {
 
       for (const value of Object.values(root)) {
         if (typeof value === 'object' && value !== null && typeof value.path === 'string') {
-          const libPath = value.path.replace(/\\\\/g, '\\');
+          const libPath = this.scanner.normalizeLibraryPath(value.path);
           if (await pathExists(path.join(libPath, 'steamapps'))) {
             libraries.add(libPath);
           }
         }
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      permissionWarnings.push(`Gagal membaca libraryfolders.vdf: ${msg}`);
       this.logger.warn('Failed to parse libraryfolders.vdf', {
         vdfPath,
-        error: err instanceof Error ? err.message : String(err),
+        error: msg,
       });
     }
 
@@ -292,13 +386,21 @@ export class SteamManager {
     }
 
     const discoveredAppIds = new Set<number>();
+    let manifestsParsed = 0;
+    const staleManifests: Array<{ appId: number; file: string; reason: string }> = [];
 
     for (const libPath of installation.libraryPaths) {
       const steamAppsDir = path.join(libPath, 'steamapps');
       let files: string[] = [];
       try {
         files = await fs.readdir(steamAppsDir);
-      } catch {
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (this.lastDiagnostics) {
+          this.lastDiagnostics.permissionWarnings.push(
+            `Tidak dapat membaca ${steamAppsDir}: ${msg}`,
+          );
+        }
         continue;
       }
 
@@ -312,22 +414,41 @@ export class SteamManager {
           const raw = await fs.readFile(fullManifestPath, 'utf8');
           const parsed = parseVdf(raw);
           const appState = (parsed.AppState ?? parsed) as VdfObject;
+          manifestsParsed += 1;
 
           const appId = Number.parseInt(String(appState.appid ?? ''), 10);
           const name = typeof appState.name === 'string' ? appState.name : `App ${appId}`;
           const installDir =
             typeof appState.installdir === 'string' ? appState.installdir : '';
+          const stateFlags = String(appState.StateFlags ?? '');
           const sizeOnDiskBytes = Number.parseInt(
             String(appState.SizeOnDisk ?? appState.BytesDownloaded ?? '0'),
             10,
           );
 
           if (Number.isNaN(appId) || !installDir) {
+            staleManifests.push({
+              appId: Number.isNaN(appId) ? 0 : appId,
+              file: manifestFile,
+              reason: 'Manifest tidak memiliki appid atau installdir yang valid',
+            });
+            continue;
+          }
+
+          const installPath = path.join(steamAppsDir, 'common', installDir);
+          const installDirExists = await pathExists(installPath);
+          if (!installDirExists || (stateFlags && stateFlags !== '4')) {
+            staleManifests.push({
+              appId,
+              file: manifestFile,
+              reason: !installDirExists
+                ? `Direktori instalasi tidak ditemukan: ${installPath}`
+                : `StateFlags=${stateFlags} (unduhan belum selesai/stale)`,
+            });
             continue;
           }
 
           discoveredAppIds.add(appId);
-          const installPath = path.join(steamAppsDir, 'common', installDir);
           const executablePath = await this.detectExecutable(installPath, name);
           const compatibility = assessGameCompatibility(appId, executablePath !== null);
 
@@ -362,6 +483,27 @@ export class SteamManager {
           });
         }
       }
+    }
+
+    if (discoveredAppIds.size === 0) {
+      await prisma.steamGame.deleteMany({});
+    } else {
+      await prisma.steamGame.deleteMany({
+        where: { appId: { notIn: Array.from(discoveredAppIds) } },
+      });
+    }
+
+    if (this.lastDiagnostics) {
+      this.lastDiagnostics = {
+        ...this.lastDiagnostics,
+        manifestsParsed,
+        staleManifests,
+        progress: {
+          stage: 'completed',
+          percent: 100,
+          message: `Pemindaian selesai: ${discoveredAppIds.size} game valid, ${staleManifests.length} manifest stale.`,
+        },
+      };
     }
 
     await recordSystemLog('info', 'steam', `Steam library scan completed (${discoveredAppIds.size} games found)`);

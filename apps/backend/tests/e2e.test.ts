@@ -154,4 +154,45 @@ describe('End-to-End Backend Pipeline', () => {
       await fs.rm(tmpPng, { force: true });
     }
   });
+
+  it('validates Phase 13 runtime lifecycle, WebSocket broadcast, and safe session recovery', async () => {
+    const config = loadEnvConfig();
+    const ctx = createBackendApp({
+      ...config,
+      port: 0,
+      logLevel: 'error',
+      pythonBin: process.platform === 'win32' ? 'python' : 'python3',
+      pythonWorkerPath: path.resolve(process.cwd(), '..', 'python-worker', 'main.py'),
+    });
+
+    try {
+      const started = await ctx.runtimeOrchestrator.startSession({
+        gameId: 'stardew-valley',
+        windowTitle: 'Stardew Valley',
+        goal: 'Observasi dan siram tanaman',
+      });
+      assert.equal(started.phase, 'running');
+      assert.ok(started.activeSession);
+      assert.equal(started.activeSession.status, 'active');
+
+      const stepped = await ctx.runtimeOrchestrator.runStep({ dryRun: true });
+      assert.equal(stepped.cycle.gameId, 'stardew-valley');
+      assert.ok((stepped.runtime.activeSession?.totalDecisions ?? 0) >= 1);
+
+      const stopped = await ctx.runtimeOrchestrator.stopSession('Uji selesai');
+      assert.equal(stopped.phase, 'idle');
+
+      const recovered = await ctx.runtimeOrchestrator.recoverInterruptedSessions();
+      assert.equal(recovered.runtime.supervisionState?.aiPaused, true);
+
+      await ctx.workerClient.stop();
+      assert.equal(ctx.workerClient.isRunning(), false);
+      const workerHealth = await ctx.workerClient.checkHealth();
+      assert.equal(workerHealth.status, 'healthy');
+    } finally {
+      await ctx.workerClient.stop();
+      ctx.wss.close();
+      await disconnectDatabase();
+    }
+  });
 });
