@@ -83,6 +83,7 @@ export class PythonWorkerClient {
     });
 
     child.on('error', (err) => {
+      if (this.process !== child) return;
       const code = (err as NodeJS.ErrnoException).code;
       const friendly =
         code === 'ENOENT'
@@ -96,6 +97,7 @@ export class PythonWorkerClient {
     });
 
     child.on('exit', (code, signal) => {
+      if (this.process !== child) return;
       const isWinStoreAlias = process.platform === 'win32' && (code === 9009 || code === 49);
       const friendly = isWinStoreAlias
         ? `Python belum terpasang (Windows Store stub exit code=${code}). Pasang Python 3.11+ agar fitur Vision/Kontroler aktif.`

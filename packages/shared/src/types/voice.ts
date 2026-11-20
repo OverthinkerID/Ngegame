@@ -41,6 +41,8 @@ export interface VoiceSpeakRequest {
   emotion?: VoiceEmotion;
   profileId?: string;
   playAudio?: boolean;
+  referenceAudioBase64?: string;
+  referenceFileName?: string;
 }
 
 export interface VoiceCommentaryRequest {
