@@ -29,7 +29,8 @@ export function SystemMonitorPage({
     setChecking(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:47800/api/system/integrity');
+      const host = '127.0.0.1';
+      const res = await fetch(`http://${host}:47800/api/system/integrity`);
       if (res.ok) {
         const json = (await res.json()) as { integrity?: { ok: boolean; result: string } };
         setIntegrity(json.integrity ?? null);

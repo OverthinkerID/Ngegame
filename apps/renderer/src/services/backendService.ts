@@ -39,8 +39,9 @@ import type {
   WorkerResponse,
 } from '@ngegame/shared';
 
-const BACKEND_BASE = 'http://localhost:47800';
-export const BACKEND_WS_URL = 'ws://localhost:47800/ws';
+const LOOPBACK_HOST = '127.0.0.1';
+const BACKEND_BASE = `http://${LOOPBACK_HOST}:47800`;
+export const BACKEND_WS_URL = `ws://${LOOPBACK_HOST}:47800/ws`;
 
 async function requestJson<T>(endpoint: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BACKEND_BASE}${endpoint}`, init);
