@@ -3,58 +3,81 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ngegame — Overthinker AI Gaming &amp; Live Streaming Studio</title>
+  <title>Ngegame — Overthinker Studio | AI Gaming &amp; Live Streaming Center</title>
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
   <style>
     :root {
-      --bg: #0b0d12;
-      --surface: #131722;
-      --surface-2: #191f2e;
-      --border: #262e42;
-      --text: #f1f5f9;
-      --muted: #94a3b8;
+      --bg: #0f130e;
+      --bg-alt: #141812;
+      --surface: #1a2018;
+      --surface-2: #222a1f;
+      --border: #2e3a29;
+      --olive: #6f9c4e;
+      --olive-dark: #394f29;
       --blue: #009eeb;
       --orange: #ff9233;
-      --purple: #8b5cf6;
-      --green: #10b981;
+      --text: #f3f6f1;
+      --muted: #a3b19c;
+      --warn: #f59e0b;
     }
     * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
       margin: 0;
       font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: radial-gradient(circle at top right, rgba(0, 158, 235, 0.14), transparent 38%),
-                  radial-gradient(circle at top left, rgba(139, 92, 246, 0.14), transparent 36%),
-                  var(--bg);
+      background:
+        radial-gradient(circle at 85% 0%, rgba(111, 156, 78, 0.16), transparent 36%),
+        radial-gradient(circle at 10% 10%, rgba(0, 158, 235, 0.12), transparent 35%),
+        var(--bg);
       color: var(--text);
-      line-height: 1.6;
+      line-height: 1.65;
     }
     a { color: var(--blue); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .container { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
     header {
-      position: sticky; top: 0; z-index: 20;
+      position: sticky; top: 0; z-index: 30;
       backdrop-filter: blur(12px);
-      background: rgba(11, 13, 18, 0.85);
+      background: rgba(15, 19, 14, 0.9);
       border-bottom: 1px solid var(--border);
     }
     .nav {
       display: flex; align-items: center; justify-content: space-between;
-      height: 64px; gap: 16px;
+      min-height: 66px; gap: 16px; flex-wrap: wrap; padding: 8px 0;
     }
-    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 18px; color: var(--text); }
-    .brand img { width: 34px; height: 34px; }
-    .nav-links { display: flex; gap: 20px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
-    .nav-links a { color: var(--muted); font-weight: 500; }
+    .brand {
+      display: flex; align-items: center; gap: 12px; color: var(--text);
+      text-decoration: none;
+    }
+    .brand img { width: 36px; height: 36px; }
+    .brand-title { font-weight: 800; font-size: 18px; letter-spacing: 0.01em; line-height: 1.1; }
+    .brand-sub { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); }
+    .nav-links { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+    .nav-links a { color: var(--muted); font-weight: 600; }
     .nav-links a:hover { color: var(--text); text-decoration: none; }
-    .hero { padding: 64px 0 40px; text-align: center; }
+    .nav-cta {
+      padding: 8px 14px; border-radius: 10px;
+      background: var(--olive-dark); border: 1px solid var(--olive);
+      color: #fff !important; font-size: 12.5px;
+    }
+    .prerelease-banner {
+      margin-top: 24px;
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px 18px; border-radius: 14px;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      font-size: 13px; color: #fde68a;
+    }
+    .hero { padding: 48px 0 36px; text-align: center; }
     .pill {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 6px 14px; border-radius: 999px;
-      background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.35);
-      color: #c4b5fd; font-size: 12px; font-weight: 600; margin-bottom: 18px;
+      background: rgba(111, 156, 78, 0.16);
+      border: 1px solid rgba(111, 156, 78, 0.45);
+      color: #cbe6b7; font-size: 12px; font-weight: 600; margin-bottom: 16px;
     }
-    h1 { font-size: clamp(30px, 5vw, 48px); line-height: 1.15; margin: 0 0 14px; }
-    .hero p { max-width: 700px; margin: 0 auto 28px; color: var(--muted); font-size: 16px; }
+    h1 { font-size: clamp(30px, 5vw, 48px); line-height: 1.15; margin: 0 0 16px; }
+    .hero p { max-width: 740px; margin: 0 auto 28px; color: var(--muted); font-size: 16px; }
     .cta-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
     .btn {
       display: inline-flex; align-items: center; gap: 8px;
@@ -62,42 +85,40 @@
       border: 1px solid var(--border); background: var(--surface); color: var(--text);
       transition: transform 0.15s ease, border-color 0.15s ease;
     }
-    .btn:hover { transform: translateY(-1px); border-color: var(--blue); text-decoration: none; }
-    .btn-primary {
-      background: linear-gradient(135deg, #009eeb, #2563eb);
-      border-color: transparent; color: #fff;
-    }
-    .btn-mac {
-      background: linear-gradient(135deg, #8b5cf6, #6d28d9);
-      border-color: transparent; color: #fff;
-    }
-    .stack-row {
-      display: flex; justify-content: center; flex-wrap: wrap; gap: 10px;
-      margin-top: 28px;
-    }
+    .btn:hover { transform: translateY(-1px); border-color: var(--olive); text-decoration: none; }
+    .btn-win { background: linear-gradient(135deg, #009eeb, #1d4ed8); border-color: transparent; color: #fff; }
+    .btn-mac { background: linear-gradient(135deg, #394f29, #6f9c4e); border-color: transparent; color: #fff; }
+    .stack-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
     .stack-badge {
       font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
       background: var(--surface); border: 1px solid var(--border); color: var(--muted);
     }
-    section { padding: 44px 0; }
-    h2 { font-size: 24px; margin: 0 0 8px; }
+    section { padding: 42px 0; }
+    h2 { font-size: 25px; margin: 0 0 8px; }
     .sub { color: var(--muted); font-size: 14px; margin: 0 0 24px; }
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
     .card {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: 16px; padding: 20px;
     }
-    .card h3 { margin: 0 0 8px; font-size: 16px; }
+    .card h3 { margin: 0 0 8px; font-size: 16px; color: #ffffff; }
     .card p, .card li { color: var(--muted); font-size: 13.5px; }
     .card ol, .card ul { padding-left: 18px; margin: 8px 0 0; }
-    .shot {
-      width: 100%; border-radius: 12px; border: 1px solid var(--border);
-      display: block; background: #090b10;
+    .tag {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      padding: 3px 8px; border-radius: 6px; margin-bottom: 10px;
+      background: rgba(111, 156, 78, 0.18); color: #cbe6b7; border: 1px solid rgba(111, 156, 78, 0.35);
     }
+    .shot { width: 100%; border-radius: 12px; border: 1px solid var(--border); display: block; background: #090b10; }
     .shot-cap { margin-top: 10px; font-size: 13px; color: var(--muted); text-align: center; }
     code {
       background: var(--surface-2); padding: 2px 6px; border-radius: 6px;
-      font-size: 12.5px; color: #7dd3fc;
+      font-size: 12.5px; color: #bfe8a1;
+    }
+    pre {
+      background: #0c0f0b; border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px; overflow-x: auto; font-size: 12px; color: #d9f99d;
     }
     footer {
       border-top: 1px solid var(--border); padding: 32px 0 48px;
@@ -110,38 +131,40 @@
     <div class="container nav">
       <a class="brand" href="#top">
         <img src="assets/icon.svg" alt="Ngegame Logo" />
-        <span><span style="color:var(--blue)">Nge</span><span style="color:var(--orange)">game</span></span>
+        <div>
+          <div class="brand-title"><span style="color:var(--blue)">Nge</span><span style="color:var(--orange)">game</span></div>
+          <div class="brand-sub">Overthinker Studio</div>
+        </div>
       </a>
       <nav class="nav-links">
-        <a href="#unduhan">Unduh Installer</a>
+        <a href="#tentang">Tentang Aplikasi</a>
+        <a href="#unduhan">Download</a>
+        <a href="#panduan">Panduan</a>
         <a href="#pratinjau">Tampilan</a>
-        <a href="#panduan-obs">OBS &amp; Siaran</a>
-        <a href="#panduan-macos">Izin macOS</a>
-        <a href="#panduan-steam">Steam</a>
-        <a href="#panduan-ai">AI &amp; Suara</a>
+        <a href="#dukungan">Dukungan</a>
+        <a class="nav-cta" href="#unduhan">Unduh v0.1.0</a>
       </nav>
     </div>
   </header>
 
   <main id="top" class="container">
+    <div class="prerelease-banner">
+      <strong>Status Tahap Pre-Release (v0.1.0):</strong>
+      <span>
+        Aplikasi ini masih berada pada tahap pengembangan awal (<em>Public Testing Pre-release</em>). Fitur inti sudah aktif dan dapat diuji, namun beberapa modul dan kompatibilitas perangkat Windows/macOS terus disempurnakan.
+      </span>
+    </div>
+
     <section class="hero">
-      <div class="pill">Overthinker Studio &bull; v0.1.0 Pre-release</div>
-      <h1>AI Gaming Command Center &amp; Live Streaming Studio</h1>
+      <div class="pill">Overthinker Studio &bull; Desktop AI Gaming &amp; Streaming Center</div>
+      <h1>Kendali AI Gaming, Visi Layar &amp; Studio Siaran dalam Satu Aplikasi</h1>
       <p>
-        <strong>Ngegame</strong> (<em>Overthinker-Ngegame</em>) menggabungkan pemindaian game Steam,
-        pengamatan layar real-time, penalaran AI dengan pengawasan manusia <strong>L1/L2/L3</strong>,
-        sintesis suara <strong>VoxCPM 2.0</strong> Bahasa Indonesia, serta kendali <strong>OBS Studio</strong>.
+        <strong>Ngegame</strong> (<em>Overthinker-Ngegame</em>) adalah aplikasi desktop lintas platform untuk gamer dan kreator konten yang menggabungkan pemindaian pustaka Steam, pengamatan layar game real-time, penalaran AI dengan pengawasan manusia <strong>L1/L2/L3</strong>, narator suara <strong>VoxCPM 2.0</strong> Bahasa Indonesia, serta kendali <strong>OBS Studio WebSocket v5</strong>.
       </p>
-      <div class="cta-row" id="unduhan">
-        <a class="btn btn-primary" data-repo-link="/releases/latest" href="#">
-          Unduh Windows Installer (.exe x64)
-        </a>
-        <a class="btn btn-mac" data-repo-link="/releases/latest" href="#">
-          Unduh macOS Installer (.dmg / .zip)
-        </a>
-        <a class="btn" data-repo-link="" href="#">
-          Lihat Repositori GitHub
-        </a>
+      <div class="cta-row">
+        <a class="btn btn-win" href="#unduhan">Menu Download Installer</a>
+        <a class="btn btn-mac" href="#panduan">Baca Panduan Setup</a>
+        <a class="btn" data-repo-link="" href="#">Repositori GitHub</a>
       </div>
       <div class="stack-row">
         <span class="stack-badge">Electron 35</span>
@@ -153,9 +176,120 @@
       </div>
     </section>
 
+    <section id="tentang">
+      <h2>Apa Itu Ngegame?</h2>
+      <p class="sub">Dirancang oleh Overthinker Studio agar AI dapat mengamati game, membantu aksi secara aman, dan mengomentari permainan saat live streaming.</p>
+      <div class="grid-3">
+        <div class="card">
+          <div class="tag">01 &bull; Pustaka &amp; Adaptor</div>
+          <h3>Deteksi Steam &amp; Profil Game</h3>
+          <p>Memindai game Steam lokal secara otomatis dan menerapkan profil strategi/kontroler aman (<em>allowlist</em>) per genre tanpa meminta kata sandi Steam Anda.</p>
+        </div>
+        <div class="card">
+          <div class="tag">02 &bull; AI &amp; Pengawasan Manusia</div>
+          <h3>Kendali Bertingkat L1 / L2 / L3</h3>
+          <p>AI membaca layar melalui Python Vision Worker (Ollama lokal atau Cloud LLM) dengan kontrol manusia penuh: <strong>L2 Wajib Persetujuan</strong>, <strong>Takeover</strong>, dan <strong>Emergency Stop</strong> instan.</p>
+        </div>
+        <div class="card">
+          <div class="tag">03 &bull; Studio Suara &amp; Siaran</div>
+          <h3>OBS WebSocket &amp; VoxCPM 2.0</h3>
+          <p>Menghubungkan OBS Studio untuk kontrol adegan dan pratinjau output, menyimpan Stream Key YouTube/Twitch di OS Keychain/Credential Manager, serta komentar suara Bahasa Indonesia.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unduhan">
+      <h2>Download Installer (Pre-Release v0.1.0)</h2>
+      <p class="sub">Pilih paket sesuai sistem operasi Anda. Seluruh berkas rilis resmi tersedia di halaman GitHub Releases.</p>
+      <div class="grid-2">
+        <div class="card">
+          <div class="tag">Windows 10 / 11 (x64)</div>
+          <h3>Windows Installer (.exe NSIS)</h3>
+          <p>Paket instalasi lengkap berisi aplikasi Electron, backend Node.js, dan database SQLite lokal.</p>
+          <ul>
+            <li>Berkas: <code>Overthinker-Ngegame-Setup-0.1.0-x64.exe</code></li>
+            <li>Verifikasi checksum melalui <code>SHA256SUMS.txt</code> di PowerShell:</li>
+          </ul>
+          <pre>Get-FileHash .\Overthinker-Ngegame-Setup-0.1.0-x64.exe -Algorithm SHA256</pre>
+          <p><a class="btn btn-win" data-repo-link="/releases" href="#">Unduh untuk Windows &rarr;</a></p>
+        </div>
+
+        <div class="card">
+          <div class="tag">macOS Apple Silicon (arm64)</div>
+          <h3>macOS Installer (.dmg / .zip)</h3>
+          <p>Berjalan native di Mac M1/M2/M3/M4. Bila dibuka pertama kali tanpa sertifikat Apple Developer, klik kanan aplikasi &rarr; pilih <strong>Open</strong>.</p>
+          <ul>
+            <li>Berkas: <code>Overthinker-Ngegame-0.1.0-arm64.dmg</code> atau <code>.zip</code></li>
+            <li>Pastikan izin <em>Screen Recording</em> &amp; <em>Accessibility</em> diaktifkan.</li>
+          </ul>
+          <p><a class="btn btn-mac" data-repo-link="/releases" href="#">Unduh untuk macOS &rarr;</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="panduan">
+      <h2>Panduan Konfigurasi Lengkap</h2>
+      <p class="sub">Ikuti panduan di bawah ini bila aplikasi menampilkan pesan perlu konfigurasi OBS, kunci siaran, Steam, atau izin macOS.</p>
+      <div class="grid-2">
+        <article class="card" id="panduan-obs">
+          <h3>1. Setup OBS Studio, YouTube Live, &amp; Twitch</h3>
+          <ol>
+            <li>Buka <strong>OBS Studio 28+</strong> &rarr; <code>Tools &rarr; WebSocket Server Settings</code> &rarr; centang <strong>Enable WebSocket server</strong> pada port <code>4455</code>.</li>
+            <li>Di menu <strong>Studio Siaran</strong> pada Ngegame, klik <strong>Hubungkan OBS WebSocket</strong>.</li>
+            <li>Salin Stream Key dari <strong>YouTube Studio</strong> atau <strong>Twitch Creator Dashboard</strong> ke panel <strong>Manajer Kredensial</strong> sebelum menekan <strong>Mulai Siaran</strong>.</li>
+          </ol>
+        </article>
+
+        <article class="card" id="panduan-macos">
+          <h3>2. Izin Wajib macOS (System Settings)</h3>
+          <ol>
+            <li>Buka <strong>System Settings &rarr; Privacy &amp; Security</strong>.</li>
+            <li>Aktifkan <strong>Ngegame</strong> di <strong>Screen &amp; System Audio Recording</strong> untuk Monitor Visi.</li>
+            <li>Aktifkan <strong>Ngegame</strong> di <strong>Accessibility</strong> dan <strong>Input Monitoring</strong> agar Kendali AI dapat mengirim input aman saat diizinkan.</li>
+          </ol>
+        </article>
+
+        <article class="card" id="panduan-steam">
+          <h3>3. Setup Pustaka Game Steam</h3>
+          <ol>
+            <li>Pastikan <strong>Steam Client</strong> sudah terpasang di perangkat Anda.</li>
+            <li>Buka menu <strong>Pustaka Game</strong> di Ngegame lalu klik <strong>Pindai Pustaka</strong>.</li>
+            <li>Ngegame hanya membaca berkas <code>appmanifest_*.acf</code> lokal tanpa meminta login Steam.</li>
+          </ol>
+        </article>
+
+        <article class="card" id="panduan-ai">
+          <h3>4. Konfigurasi AI Brain (Ollama / OpenAI)</h3>
+          <ul>
+            <li><strong>Ollama (Lokal):</strong> Jalankan layanan Ollama lokal untuk penalaran gratis di perangkat sendiri.</li>
+            <li><strong>OpenAI (Cloud):</strong> Opsi cadangan dengan kunci API pribadi.</li>
+            <li>Gunakan mode <strong>L2 Wajib Persetujuan</strong> untuk meninjau setiap aksi AI sebelum dijalankan.</li>
+          </ul>
+        </article>
+
+        <article class="card" id="panduan-suara">
+          <h3>5. Studio Suara AI (VoxCPM 2.0)</h3>
+          <ul>
+            <li>Gunakan panel <strong>Sampel Cloning Suara</strong> untuk memutar 3 preset suara Bahasa Indonesia atau mengunggah audio referensi (<code>.wav</code>/<code>.mp3</code>).</li>
+            <li>Jika server VoxCPM 2.0 lokal belum aktif, aplikasi tetap aman dengan suara cadangan lokal.</li>
+          </ul>
+        </article>
+
+        <article class="card" id="dukungan">
+          <h3>6. Tentang Pengembang &amp; Dukungan</h3>
+          <p>
+            <strong>Ngegame</strong> dikembangkan oleh <strong>Overthinker Studio</strong> (<code>OverthinkerID</code>). Dukungan Anda melalui Star GitHub, laporan bug, atau kontribusi kode sangat membantu pengembangan ke versi stabil <code>v1.0.0</code>.
+          </p>
+          <p>
+            <a data-repo-link="/issues" href="#">Laporkan Bug / Ajukan Fitur &rarr;</a>
+          </p>
+        </article>
+      </div>
+    </section>
+
     <section id="pratinjau">
-      <h2>Pratinjau Antarmuka</h2>
-      <p class="sub">Tampilan Dark Mode dan Light Mode dengan 11 menu terstruktur dan kontrol keamanan global.</p>
+      <h2>Pratinjau Aplikasi</h2>
+      <p class="sub">Antarmuka Overthinker Studio dalam Mode Gelap, Mode Terang, Pusat Kendali AI, dan Studio Siaran.</p>
       <div class="grid-2">
         <div class="card">
           <img class="shot" src="assets/screenshots/dashboard-dark.png" alt="Dasbor Ngegame Mode Gelap" />
@@ -167,7 +301,7 @@
         </div>
         <div class="card">
           <img class="shot" src="assets/screenshots/ai-command-center.png" alt="Pusat Kendali AI" />
-          <div class="shot-cap">Kendali AI &amp; Pengawasan Manusia (L1/L2/L3)</div>
+          <div class="shot-cap">Kendali AI &amp; Pengawasan Manusia</div>
         </div>
         <div class="card">
           <img class="shot" src="assets/screenshots/streaming-studio.png" alt="Studio Siaran OBS" />
@@ -175,73 +309,11 @@
         </div>
       </div>
     </section>
-
-    <section id="panduan">
-      <h2>Panduan Konfigurasi &amp; Troubleshooting</h2>
-      <p class="sub">Langkah cepat menyiapkan layanan pihak ketiga dan izin sistem operasi agar seluruh fitur berjalan penuh.</p>
-
-      <div class="grid-2">
-        <article class="card" id="panduan-obs">
-          <h3>1. Setup OBS Studio, YouTube Live, &amp; Twitch</h3>
-          <ol>
-            <li>Buka <strong>OBS Studio 28+</strong>, masuk ke menu <code>Tools &rarr; WebSocket Server Settings</code>, lalu centang <strong>Enable WebSocket server</strong> pada port <code>4455</code>.</li>
-            <li>Di menu <strong>Studio Siaran</strong> pada Ngegame, klik <strong>Hubungkan OBS WebSocket</strong>.</li>
-            <li>Untuk error <em>Stream key belum dikonfigurasi</em>: salin Stream Key dari <strong>YouTube Studio (Go Live)</strong> atau <strong>Twitch Creator Dashboard</strong>, lalu simpan di kartu <strong>Manajer Kredensial</strong> (tersimpan aman di OS Keychain / Windows Credential Manager).</li>
-          </ol>
-        </article>
-
-        <article class="card" id="panduan-macos">
-          <h3>2. Izin Wajib macOS (Screen Recording &amp; Accessibility)</h3>
-          <ol>
-            <li>Buka <strong>System Settings &rarr; Privacy &amp; Security</strong> di macOS.</li>
-            <li>Aktifkan <strong>Ngegame</strong> pada bagian <strong>Screen &amp; System Audio Recording</strong> agar Monitor Visi dapat menangkap layar game.</li>
-            <li>Aktifkan <strong>Ngegame</strong> pada bagian <strong>Accessibility</strong> dan <strong>Input Monitoring</strong> agar kontroler AI dapat mengirim input aman saat izin L1/L2 disetujui.</li>
-            <li>Jika aplikasi dibuka pertama kali tanpa Apple Developer signing, klik kanan aplikasi &rarr; pilih <strong>Open</strong>.</li>
-          </ol>
-        </article>
-
-        <article class="card" id="panduan-steam">
-          <h3>3. Setup Pustaka Game Steam</h3>
-          <ol>
-            <li>Pastikan <strong>Steam Client</strong> sudah terpasang dan minimal satu game terinstal.</li>
-            <li>Buka menu <strong>Pustaka Game</strong> di Ngegame lalu tekan <strong>Pindai Pustaka</strong>.</li>
-            <li>Ngegame membaca berkas <code>appmanifest_*.acf</code> secara lokal tanpa meminta kata sandi akun Steam Anda.</li>
-          </ol>
-        </article>
-
-        <article class="card" id="panduan-ai">
-          <h3>4. Konfigurasi AI Brain &amp; Izin L1 / L2 / L3</h3>
-          <ul>
-            <li><strong>Ollama (Lokal):</strong> Jalankan Ollama di perangkat Anda untuk penalaran AI gratis tanpa API cloud.</li>
-            <li><strong>OpenAI (Cloud):</strong> Opsional sebagai cadangan bila Ollama tidak aktif.</li>
-            <li><strong>L1 / L2 / L3:</strong> Mulai selalu dengan <strong>L2 Wajib Persetujuan</strong> untuk menguji aksi AI dengan aman, atau tekan <strong>Emergency Stop</strong> kapan saja.</li>
-          </ul>
-        </article>
-
-        <article class="card" id="panduan-suara">
-          <h3>5. Studio Suara AI (VoxCPM 2.0)</h3>
-          <ul>
-            <li>Gunakan panel <strong>Sampel Cloning Suara</strong> untuk menguji preset narator Bahasa Indonesia atau mengunggah audio referensi (<code>.wav</code>/<code>.mp3</code>).</li>
-            <li>Apabila server VoxCPM 2.0 lokal belum berjalan di port <code>8000</code>, aplikasi otomatis memakai mekanisme cadangan lokal tanpa mengganggu game.</li>
-          </ul>
-        </article>
-
-        <article class="card" id="dukungan">
-          <h3>6. Dukungan Pengembangan</h3>
-          <p>
-            <strong>Ngegame</strong> dikembangkan oleh <strong>Overthinker Studio</strong>. Anda dapat mendukung pengembangan melalui Star repositori, laporan bug, atau pull request di GitHub.
-          </p>
-          <p>
-            <a data-repo-link="/issues" href="#">Laporkan Bug / Ajukan Fitur &rarr;</a>
-          </p>
-        </article>
-      </div>
-    </section>
   </main>
 
   <footer>
     <div class="container">
-      Dikembangkan oleh <strong>Overthinker Studio</strong> (OverthinkerID) &bull; Ngegame v0.1.0
+      Dikembangkan oleh <strong>Overthinker Studio</strong> (OverthinkerID) &bull; Ngegame v0.1.0 Pre-release
     </div>
   </footer>
 
