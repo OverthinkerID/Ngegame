@@ -51,15 +51,16 @@ function DashboardShell(): React.JSX.Element {
     setLoading(true);
     setError(null);
     try {
-      const [info, healthData, recentLogs, summary, stream, sup] = await Promise.all([
-        backendService.getAppInfo(),
+      const info = await backendService.getAppInfo().catch(() => null);
+      if (info) setAppInfo(info);
+
+      const [healthData, recentLogs, summary, stream, sup] = await Promise.all([
         backendService.getHealth(),
         backendService.getRecentLogs(30),
         backendService.getAnalyticsSummary().catch(() => null),
         backendService.getStreamingStatus().catch(() => null),
         backendService.getSupervisionState().catch(() => null),
       ]);
-      setAppInfo(info);
       setHealth(healthData);
       setLogs(recentLogs);
       if (summary) setAnalytics(summary);

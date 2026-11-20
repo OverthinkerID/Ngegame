@@ -66,11 +66,7 @@ export function Topbar({
   const recentAlerts = logs.filter((l) => l.level === 'warn' || l.level === 'error').slice(0, 6);
 
   return (
-    <header
-      className={`app-drag-region relative z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5 ${
-        isWindows ? 'pr-36' : ''
-      }`}
-    >
+    <header className="relative z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-5">
       {/* Kiri: Breadcrumb Bersih */}
       <div className="app-no-drag flex min-w-0 items-center gap-2 text-xs">
         <span className="hidden font-medium text-[var(--text-muted)] sm:inline">

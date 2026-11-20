@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, session, utilityProcess, type UtilityProcess } from 'electron';
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -47,12 +48,17 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const BACKEND_URL = 'http://localhost:47800';
+const LOOPBACK_HOST = '127.0.0.1';
+const DEFAULT_BACKEND_PORT = 47800;
+let activeBackendPort = DEFAULT_BACKEND_PORT;
+const getBackendUrl = (): string => `http://${LOOPBACK_HOST}:${activeBackendPort}`;
 const RENDERER_DEV_URL = 'http://localhost:5173';
 const IS_DEV = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
 let embeddedBackend: UtilityProcess | null = null;
+let backendRestartCount = 0;
+let lastBackendExitCode: number | null = null;
 
 function clampLimit(raw: unknown, fallback = 15, max = 200): number {
   if (typeof raw !== 'number' || !Number.isFinite(raw)) return fallback;
@@ -64,6 +70,42 @@ function assertPositiveInt(raw: unknown, label: string): number {
     throw new Error(`Parameter IPC tidak valid: ${label}`);
   }
   return raw;
+}
+
+function getLogDir(): string {
+  return path.join(app.getPath('userData'), 'logs');
+}
+
+function appendBootLog(logDir: string, message: string): void {
+  try {
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(
+      path.join(logDir, 'backend-boot.log'),
+      `${new Date().toISOString()} ${message}\n`,
+      'utf8',
+    );
+  } catch {
+    // Abaikan error penulisan boot log
+  }
+}
+
+async function resolveAvailablePort(preferredPort: number): Promise<number> {
+  const tryListen = (port: number): Promise<number | null> =>
+    new Promise((resolve) => {
+      const srv = net.createServer();
+      srv.unref();
+      srv.on('error', () => resolve(null));
+      srv.listen(port, LOOPBACK_HOST, () => {
+        const addr = srv.address();
+        const boundPort = typeof addr === 'object' && addr ? addr.port : port;
+        srv.close(() => resolve(boundPort));
+      });
+    });
+
+  const preferred = await tryListen(preferredPort);
+  if (preferred !== null) return preferred;
+  const ephemeral = await tryListen(0);
+  return ephemeral ?? preferredPort;
 }
 
 function startEmbeddedBackendIfPackaged(): void {
@@ -78,20 +120,84 @@ function startEmbeddedBackendIfPackaged(): void {
     fs.mkdirSync(userDataDir, { recursive: true });
     fs.copyFileSync(templateDbPath, userDbPath);
   }
-  const logDir = path.join(userDataDir, 'logs');
+  const logDir = getLogDir();
+  const prismaEngineFile =
+    process.platform === 'win32'
+      ? 'query_engine-windows.dll.node'
+      : 'libquery_engine-darwin-arm64.dylib.node';
+  const prismaEnginePath = path.join(
+    unpackedRoot,
+    'node_modules',
+    '.prisma',
+    'client',
+    prismaEngineFile,
+  );
+
+  appendBootLog(
+    logDir,
+    `Starting embedded backend: ${backendEntry} on ${LOOPBACK_HOST}:${activeBackendPort}`,
+  );
   embeddedBackend = utilityProcess.fork(backendEntry, [], {
+    stdio: 'pipe',
     env: {
       ...process.env,
       NODE_ENV: 'production',
+      BACKEND_HOST: LOOPBACK_HOST,
+      BACKEND_PORT: String(activeBackendPort),
       DATABASE_URL: `file:${userDbPath}`,
       PYTHON_WORKER_PATH: workerScript,
       NGEGAME_LOG_DIR: logDir,
+      ...(fs.existsSync(prismaEnginePath)
+        ? { PRISMA_QUERY_ENGINE_LIBRARY: prismaEnginePath }
+        : {}),
     },
+  });
+
+  embeddedBackend.stdout?.on('data', (chunk: Buffer) => {
+    appendBootLog(logDir, `[stdout] ${chunk.toString('utf8').trimEnd()}`);
+  });
+  embeddedBackend.stderr?.on('data', (chunk: Buffer) => {
+    appendBootLog(logDir, `[stderr] ${chunk.toString('utf8').trimEnd()}`);
+  });
+  embeddedBackend.on('exit', (code) => {
+    lastBackendExitCode = code;
+    appendBootLog(logDir, `Embedded backend exited with code ${code}`);
+    embeddedBackend = null;
+    if (!IS_DEV && mainWindow && backendRestartCount < 1 && code !== 0) {
+      backendRestartCount += 1;
+      appendBootLog(logDir, `Attempting safe backend restart (#${backendRestartCount})`);
+      startEmbeddedBackendIfPackaged();
+    }
   });
 }
 
+async function waitForBackendReady(timeoutMs = 8000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/health`);
+      if (res.ok) return true;
+    } catch {
+      // Backend masih booting
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  appendBootLog(getLogDir(), `Backend readiness timeout after ${timeoutMs}ms`);
+  return false;
+}
+
 async function fetchBackendJson<T>(endpoint: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${BACKEND_URL}${endpoint}`, init);
+  let response: Response;
+  try {
+    response = await fetch(`${getBackendUrl()}${endpoint}`, init);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    const bootLog = path.join(getLogDir(), 'backend-boot.log');
+    const exitInfo = lastBackendExitCode !== null ? ` (exit=${lastBackendExitCode})` : '';
+    throw new Error(
+      `Backend tidak terjangkau di ${getBackendUrl()}${exitInfo}: ${reason}. Periksa log: ${bootLog}`,
+    );
+  }
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`Backend error (${response.status}): ${text}`);
@@ -108,7 +214,7 @@ function registerIpcHandlers(): void {
       arch: process.arch,
       electronVersion: process.versions.electron,
       nodeVersion: process.versions.node,
-      backendUrl: BACKEND_URL,
+      backendUrl: getBackendUrl(),
     };
   });
 
@@ -589,7 +695,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.ANALYTICS_EXPORT,
     async (_event, format: 'json' | 'csv'): Promise<string> => {
-      const response = await fetch(`${BACKEND_URL}/api/analytics/export?format=${format}`);
+      const response = await fetch(`${getBackendUrl()}/api/analytics/export?format=${format}`);
       if (!response.ok) {
         throw new Error(`Export error (${response.status})`);
       }
@@ -601,7 +707,6 @@ function registerIpcHandlers(): void {
 async function createMainWindow(): Promise<void> {
   const preloadPath = path.resolve(__dirname, '..', 'dist-preload', 'preload.js');
   const iconPath = path.resolve(__dirname, '..', 'assets', 'icon.png');
-  const isWindows = process.platform === 'win32';
 
   mainWindow = new BrowserWindow({
     width: 1240,
@@ -612,16 +717,6 @@ async function createMainWindow(): Promise<void> {
     icon: iconPath,
     backgroundColor: '#0a0e09',
     autoHideMenuBar: true,
-    ...(isWindows
-      ? {
-          titleBarStyle: 'hidden' as const,
-          titleBarOverlay: {
-            color: '#0e130c',
-            symbolColor: '#e2e8f0',
-            height: 40,
-          },
-        }
-      : {}),
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -654,8 +749,14 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(false);
   });
-  startEmbeddedBackendIfPackaged();
+  if (!IS_DEV) {
+    activeBackendPort = await resolveAvailablePort(DEFAULT_BACKEND_PORT);
+    startEmbeddedBackendIfPackaged();
+  }
   registerIpcHandlers();
+  if (!IS_DEV) {
+    await waitForBackendReady();
+  }
   await createMainWindow();
 
   app.on('activate', () => {

@@ -83,25 +83,26 @@ export class PythonWorkerClient {
     });
 
     child.on('error', (err) => {
-      this.logger.error('Python worker process error', { error: err.message });
+      const code = (err as NodeJS.ErrnoException).code;
+      const friendly =
+        code === 'ENOENT'
+          ? `Python executable '${this.pythonBin}' tidak ditemukan di PATH. Pasang Python 3.11+ atau atur PYTHON_BIN.`
+          : `Python worker process error: ${err.message}`;
+      this.logger.error(friendly, { error: err.message, code });
       this.rejectAllPending(
-        new AppError(
-          `Python worker process error: ${err.message}`,
-          ErrorCode.WORKER_UNAVAILABLE,
-          503,
-        ),
+        new AppError(friendly, ErrorCode.WORKER_UNAVAILABLE, 503),
       );
       this.cleanup();
     });
 
     child.on('exit', (code, signal) => {
-      this.logger.warn('Python worker exited', { code, signal });
+      const isWinStoreAlias = process.platform === 'win32' && (code === 9009 || code === 49);
+      const friendly = isWinStoreAlias
+        ? `Python belum terpasang (Windows Store stub exit code=${code}). Pasang Python 3.11+ agar fitur Vision/Kontroler aktif.`
+        : `Python worker exited unexpectedly (code=${code}, signal=${signal})`;
+      this.logger.warn(friendly, { code, signal });
       this.rejectAllPending(
-        new AppError(
-          `Python worker exited unexpectedly (code=${code}, signal=${signal})`,
-          ErrorCode.WORKER_UNAVAILABLE,
-          503,
-        ),
+        new AppError(friendly, ErrorCode.WORKER_UNAVAILABLE, 503),
       );
       this.cleanup();
     });
