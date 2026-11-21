@@ -173,7 +173,16 @@ class VoxCpmHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     server = ThreadingHTTPServer((HOST, PORT), VoxCpmHandler)
-    print(f"[voxcpm-bridge] Listening on http://{HOST}:{PORT} (VOXCPM_CMD={'set' if VOXCPM_CMD else 'local-fallback'})")
+    mode = (
+        "custom-cmd"
+        if VOXCPM_CMD
+        else "auto-voxcpm"
+        if _has_voxcpm_package()
+        else "auto-f5-tts"
+        if _has_f5tts_package()
+        else "local-fallback"
+    )
+    print(f"[voxcpm-bridge] Listening on http://{HOST}:{PORT} (mode={mode}, python={sys.executable})")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
