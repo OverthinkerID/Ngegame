@@ -45,7 +45,13 @@ def _synthesize_wav(
         cmd = shlex.split(VOXCPM_CMD) + ["--text", text, "--out", out_wav]
         if ref_path:
             cmd.extend(["--ref", ref_path])
-        subprocess.run(cmd, check=True, timeout=60)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180, check=False)
+        if proc.returncode != 0:
+            err_detail = (proc.stderr or proc.stdout or f"exit code {proc.returncode}").strip()
+            print(f"[voxcpm-bridge] VOXCPM_CMD failed: {err_detail}", flush=True)
+            raise RuntimeError(f"VOXCPM_CMD gagal: {err_detail[:400]}")
+        if not os.path.isfile(out_wav) or os.path.getsize(out_wav) == 0:
+            raise RuntimeError("VOXCPM_CMD selesai tetapi file output.wav kosong/tidak dibuat")
         return "voxcpm-custom-cmd"
 
     if platform.system() == "Darwin":
