@@ -33,6 +33,7 @@ const ICON_MAP: Record<PageId, LucideIcon> = {
   adapters: Puzzle,
   'adaptation-studio': Sliders,
   streaming: LayoutDashboard,
+  'stream-intelligence': Radio,
   voice: Mic,
   analytics: Activity,
   history: History,
@@ -43,7 +44,7 @@ const ICON_MAP: Record<PageId, LucideIcon> = {
 const NAV_GROUPS: { label: string; ids: PageId[] }[] = [
   { label: 'Utama', ids: ['dashboard', 'library'] },
   { label: 'AI & Visi', ids: ['ai-control', 'vision', 'adapters', 'adaptation-studio'] },
-  { label: 'Studio', ids: ['streaming', 'voice'] },
+  { label: 'Studio', ids: ['streaming', 'stream-intelligence', 'voice'] },
   { label: 'Sistem', ids: ['analytics', 'history', 'system-monitor', 'settings'] },
 ];
 

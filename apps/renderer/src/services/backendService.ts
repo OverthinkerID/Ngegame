@@ -1057,4 +1057,269 @@ export const backendService = {
   }> {
     return requestJson('/api/streaming/analytics');
   },
+
+  async getStreamIntelligenceStatus(): Promise<import('@ngegame/shared').StreamIntelligenceStatus> {
+    return requestJson('/api/stream-intelligence/status');
+  },
+
+  async analyzeStreamIntelligenceEvents(
+    payload?: Partial<import('@ngegame/shared').GameplayObservationInput>,
+  ): Promise<{
+    verified: boolean;
+    events: import('@ngegame/shared').VerifiedGameplayEvent[];
+    reason?: string;
+  }> {
+    return requestJson('/api/stream-intelligence/events/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload ?? {}),
+    });
+  },
+
+  async setStreamIntelligenceMode(
+    mode: import('@ngegame/shared').StreamIntelligenceMode,
+  ): Promise<{ mode: import('@ngegame/shared').StreamIntelligenceMode }> {
+    return requestJson('/api/stream-intelligence/mode', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    });
+  },
+
+  async emergencyStopStreamIntelligence(): Promise<void> {
+    await requestJson('/api/stream-intelligence/emergency-stop', { method: 'POST' });
+  },
+
+  async resetStreamIntelligenceEmergency(): Promise<void> {
+    await requestJson('/api/stream-intelligence/reset-emergency', { method: 'POST' });
+  },
+
+  async getCommentaryStatus(): Promise<import('@ngegame/shared').CommentaryStatusResponse> {
+    return requestJson('/api/stream-intelligence/commentary');
+  },
+
+  async generateStreamCommentary(input: {
+    text?: string;
+    eventId?: number;
+    personality?: import('@ngegame/shared').CommentaryPersonality;
+    language?: import('@ngegame/shared').CommentaryLanguage;
+    bypassCooldown?: boolean;
+  }): Promise<{
+    accepted: boolean;
+    reason?: string;
+    item?: import('@ngegame/shared').CommentaryItem;
+  }> {
+    return requestJson('/api/stream-intelligence/commentary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  },
+
+  async editStreamCommentary(
+    id: number,
+    editedText: string,
+  ): Promise<{ item: import('@ngegame/shared').CommentaryItem }> {
+    return requestJson(`/api/stream-intelligence/commentary/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ editedText }),
+    });
+  },
+
+  async updateCommentaryConfig(
+    partial: Partial<import('@ngegame/shared').CommentaryConfig>,
+  ): Promise<{ config: import('@ngegame/shared').CommentaryConfig }> {
+    return requestJson('/api/stream-intelligence/commentary/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(partial),
+    });
+  },
+
+  async stopStreamCommentary(
+    mute = false,
+  ): Promise<import('@ngegame/shared').CommentaryStatusResponse> {
+    return requestJson('/api/stream-intelligence/commentary/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mute }),
+    });
+  },
+
+  async getVoicePersonalityStatus(): Promise<import('@ngegame/shared').VoicePersonalityStatusResponse> {
+    return requestJson('/api/stream-intelligence/voice');
+  },
+
+  async updateVoicePersonalityConfig(
+    partial: Partial<import('@ngegame/shared').VoicePersonalityConfig>,
+  ): Promise<{ config: import('@ngegame/shared').VoicePersonalityConfig }> {
+    return requestJson('/api/stream-intelligence/voice/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(partial),
+    });
+  },
+
+  async speakVoicePersonality(input: {
+    text: string;
+    priority?: number;
+    playAudio?: boolean;
+  }): Promise<import('@ngegame/shared').VoicePersonalityStatusResponse> {
+    return requestJson('/api/stream-intelligence/voice/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  },
+
+  async interruptVoicePersonality(): Promise<import('@ngegame/shared').VoicePersonalityStatusResponse> {
+    return requestJson('/api/stream-intelligence/voice/interrupt', { method: 'POST' });
+  },
+
+  async getChatIntelligenceStatus(): Promise<import('@ngegame/shared').ChatIntelligenceStatusResponse> {
+    return requestJson('/api/stream-intelligence/chat');
+  },
+
+  async ingestChatIntelligenceMessage(input: {
+    platform: 'youtube' | 'twitch';
+    author: string;
+    message: string;
+  }): Promise<{ item: import('@ngegame/shared').ChatInteractionItem }> {
+    return requestJson('/api/stream-intelligence/chat/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  },
+
+  async updateChatIntelligenceConfig(
+    partial: Partial<import('@ngegame/shared').ChatIntelligenceConfig>,
+  ): Promise<{ config: import('@ngegame/shared').ChatIntelligenceConfig }> {
+    return requestJson('/api/stream-intelligence/chat/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(partial),
+    });
+  },
+
+  async approveChatIntelligenceReply(
+    id: number,
+    editedReply?: string,
+  ): Promise<{ item: import('@ngegame/shared').ChatInteractionItem }> {
+    return requestJson('/api/stream-intelligence/chat/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, editedReply }),
+    });
+  },
+
+  async rejectChatIntelligenceReply(
+    id: number,
+  ): Promise<{ item: import('@ngegame/shared').ChatInteractionItem }> {
+    return requestJson('/api/stream-intelligence/chat/reject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+  },
+
+  async getSceneIntelligenceStatus(): Promise<import('@ngegame/shared').SceneIntelligenceStatusResponse> {
+    return requestJson('/api/stream-intelligence/scene');
+  },
+
+  async analyzeSceneIntelligence(input?: {
+    sceneLabel?: string;
+  }): Promise<{ recommendation: import('@ngegame/shared').SceneRecommendationItem | null }> {
+    return requestJson('/api/stream-intelligence/scene/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input ?? {}),
+    });
+  },
+
+  async updateSceneIntelligenceConfig(
+    partial: Partial<import('@ngegame/shared').SceneIntelligenceConfig>,
+  ): Promise<{ config: import('@ngegame/shared').SceneIntelligenceConfig }> {
+    return requestJson('/api/stream-intelligence/scene/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(partial),
+    });
+  },
+
+  async approveSceneIntelligence(
+    id: number,
+  ): Promise<{ recommendation: import('@ngegame/shared').SceneRecommendationItem }> {
+    return requestJson('/api/stream-intelligence/scene/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+  },
+
+  async rejectSceneIntelligence(
+    id: number,
+  ): Promise<{ recommendation: import('@ngegame/shared').SceneRecommendationItem }> {
+    return requestJson('/api/stream-intelligence/scene/reject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+  },
+
+  async getHighlightsStatus(): Promise<import('@ngegame/shared').StreamHighlightsStatusResponse> {
+    return requestJson('/api/stream-intelligence/highlights');
+  },
+
+  async detectHighlight(): Promise<{
+    candidate: import('@ngegame/shared').HighlightCandidateItem | null;
+    reason?: string;
+  }> {
+    return requestJson('/api/stream-intelligence/highlights/detect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+  },
+
+  async approveHighlight(
+    id: number,
+  ): Promise<{ candidate: import('@ngegame/shared').HighlightCandidateItem }> {
+    return requestJson('/api/stream-intelligence/highlights/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+  },
+
+  async rejectHighlight(
+    id: number,
+  ): Promise<{ candidate: import('@ngegame/shared').HighlightCandidateItem }> {
+    return requestJson('/api/stream-intelligence/highlights/reject', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+  },
+
+  async exportHighlights(format: 'json' | 'csv'): Promise<string> {
+    const res = await fetch(`${BACKEND_BASE}/api/stream-intelligence/highlights/export?format=${format}`);
+    if (!res.ok) throw new Error(`Export HTTP ${res.status}`);
+    return res.text();
+  },
+
+  async getStreamSessionSummary(): Promise<import('@ngegame/shared').StreamSessionSummaryResponse> {
+    return requestJson('/api/stream-intelligence/session-summary');
+  },
+
+  async generateStreamSessionSummary(
+    durationSeconds?: number,
+  ): Promise<{ summary: import('@ngegame/shared').StreamSessionSummaryItem }> {
+    return requestJson('/api/stream-intelligence/session-summary/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ durationSeconds }),
+    });
+  },
 };
