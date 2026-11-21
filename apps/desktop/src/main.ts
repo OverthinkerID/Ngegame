@@ -1,8 +1,12 @@
 import { app, BrowserWindow, ipcMain, session, shell, utilityProcess, type UtilityProcess } from 'electron';
+import electronUpdater from 'electron-updater';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { AutoUpdateManager, DEFAULT_UPDATE_PREFERENCES } from './updater/autoUpdateManager.js';
+
+const { autoUpdater } = electronUpdater;
 import {
   IPC_CHANNELS,
   type AdapterResolveRequest,
@@ -46,6 +50,9 @@ import {
   type VoiceCommentaryRequest,
   type VoiceProfile,
   type VoiceServiceStatus,
+  type UpdateInstallOptions,
+  type UpdatePreferences,
+  type UpdateState,
   type VoiceSettings,
   type VoiceSpeakRequest,
   type VoiceSpeechResult,
@@ -66,6 +73,7 @@ let mainWindow: BrowserWindow | null = null;
 let embeddedBackend: UtilityProcess | null = null;
 let backendRestartCount = 0;
 let lastBackendExitCode: number | null = null;
+let updateManager: AutoUpdateManager | null = null;
 
 function clampLimit(raw: unknown, fallback = 15, max = 200): number {
   if (typeof raw !== 'number' || !Number.isFinite(raw)) return fallback;
@@ -862,6 +870,83 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.ADAPTATION_STARDEW_CAPS, async (_event, level: StardewCapabilityLevel = 1) => {
     return fetchBackendJson<{ currentLevel: StardewCapabilityLevel; levels: Record<number, { title: string; capabilities: string[]; smapiNote?: string }> }>(`/api/adaptation/stardew/capabilities?level=${level}`);
   });
+  ipcMain.handle(IPC_CHANNELS.UPDATER_GET_STATE, (): UpdateState => {
+    if (!updateManager) {
+      return {
+        currentVersion: app.getVersion(),
+        latestVersion: null,
+        status: 'idle',
+        updateAvailable: false,
+        releaseNotes: null,
+        releaseDate: null,
+        progress: null,
+        lastCheckedAt: null,
+        lastBackupPath: null,
+        activeTasksBlocking: false,
+        activeTasksReason: null,
+        isPackaged: app.isPackaged,
+        error: null,
+        preferences: { ...DEFAULT_UPDATE_PREFERENCES },
+      };
+    }
+    return updateManager.getState();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.UPDATER_CHECK, async (): Promise<UpdateState> => {
+    if (!updateManager) throw new Error('Updater belum siap');
+    return updateManager.checkForUpdates();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.UPDATER_DOWNLOAD, async (): Promise<UpdateState> => {
+    if (!updateManager) throw new Error('Updater belum siap');
+    return updateManager.downloadUpdate();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.UPDATER_CANCEL_DOWNLOAD, (): UpdateState => {
+    if (!updateManager) throw new Error('Updater belum siap');
+    return updateManager.cancelDownload();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.UPDATER_RETRY_DOWNLOAD, async (): Promise<UpdateState> => {
+    if (!updateManager) throw new Error('Updater belum siap');
+    return updateManager.retryDownload();
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.UPDATER_INSTALL,
+    async (_event, options?: UpdateInstallOptions): Promise<UpdateState> => {
+      if (!updateManager) throw new Error('Updater belum siap');
+      return updateManager.installUpdate(options);
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.UPDATER_GET_PREFERENCES, (): UpdatePreferences => {
+    return updateManager ? updateManager.getPreferences() : { ...DEFAULT_UPDATE_PREFERENCES };
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.UPDATER_UPDATE_PREFERENCES,
+    (_event, partial: Partial<UpdatePreferences>): UpdatePreferences => {
+      if (!updateManager) throw new Error('Updater belum siap');
+      return updateManager.updatePreferences(partial);
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.UPDATER_BACKUP_DB, (): { backupPath: string | null } => {
+    if (!updateManager) throw new Error('Updater belum siap');
+    return { backupPath: updateManager.backupDatabase() };
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.UPDATER_RESTORE_DB,
+    (_event, backupPath: string): { restored: boolean } => {
+      if (!updateManager) throw new Error('Updater belum siap');
+      if (typeof backupPath !== 'string' || !backupPath.trim()) {
+        throw new Error('backupPath tidak valid');
+      }
+      return { restored: updateManager.restoreDatabase(backupPath) };
+    },
+  );
 }
 
 async function createMainWindow(): Promise<void> {
@@ -913,11 +998,50 @@ app.whenReady().then(async () => {
     activeBackendPort = await resolveAvailablePort(DEFAULT_BACKEND_PORT);
     startEmbeddedBackendIfPackaged();
   }
+  updateManager = new AutoUpdateManager({
+    currentVersion: app.getVersion(),
+    userDataDir: app.getPath('userData'),
+    isPackaged: app.isPackaged,
+    autoUpdater,
+    onStateChanged: (state) => {
+      mainWindow?.webContents.send(IPC_CHANNELS.UPDATER_STATE_CHANGED, state);
+    },
+    checkActiveTasks: async () => {
+      const reasons: string[] = [];
+      try {
+        const st = await fetchBackendJson<StreamingStatusResponse>('/api/streaming/status');
+        if (st.health.streaming) {
+          reasons.push('Siaran langsung OBS sedang aktif');
+        }
+      } catch {
+        // ignore if backend offline
+      }
+      try {
+        const sup = await fetchBackendJson<SupervisionState>('/api/supervision/state');
+        if (!sup.aiPaused && sup.controlOwner === 'ai') {
+          reasons.push('AI sedang aktif mengendalikan game');
+        }
+      } catch {
+        // ignore if backend offline
+      }
+      return {
+        blocking: reasons.length > 0,
+        reason: reasons.length > 0 ? reasons.join(' dan ') : null,
+      };
+    },
+    stopActiveTasks: async () => {
+      await fetchBackendJson('/api/supervision/pause-ai', { method: 'POST' }).catch(() => undefined);
+      await fetchBackendJson('/api/controller/release-all', { method: 'POST' }).catch(() => undefined);
+      await fetchBackendJson('/api/streaming/stop', { method: 'POST' }).catch(() => undefined);
+    },
+    log: (msg) => appendBootLog(getLogDir(), msg),
+  });
   registerIpcHandlers();
   if (!IS_DEV) {
     await waitForBackendReady();
   }
   await createMainWindow();
+  void updateManager.maybeCheckOnStartup();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

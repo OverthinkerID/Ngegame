@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "dev": "concurrently -n backend,renderer,desktop -c cyan,magenta,green \"npm run dev -w @ngegame/backend\" \"npm run dev -w @ngegame/renderer\" \"npm run dev -w @ngegame/desktop\"",
+    "dev:all": "concurrently -n backend,renderer,desktop,voice -c cyan,magenta,green,yellow \"npm run dev -w @ngegame/backend\" \"npm run dev -w @ngegame/renderer\" \"npm run dev -w @ngegame/desktop\" \"npm run voice:server\"",
     "dev:backend": "npm run dev -w @ngegame/backend",
     "dev:renderer": "npm run dev -w @ngegame/renderer",
     "dev:desktop": "npm run dev -w @ngegame/desktop",
@@ -18,7 +19,7 @@
     "typecheck": "npm run build -w @ngegame/shared && npm run typecheck -w @ngegame/shared && npm run typecheck -w @ngegame/backend && npm run typecheck -w @ngegame/renderer && npm run typecheck -w @ngegame/desktop",
     "test": "npm run test -w @ngegame/shared && npm run test -w @ngegame/backend && npm run test -w @ngegame/renderer && npm run test:python",
     "test:python": "node -e \"const {spawnSync}=require('child_process');const bin=process.platform==='win32'?'python':'python3';const r=spawnSync(bin,['-m','unittest','discover','-s','apps/python-worker/tests','-p','test_*.py','-v'],{stdio:'inherit'});process.exit(r.status??1);\"",
-    "voice:server": "node -e \"const {spawnSync}=require('child_process');const bin=process.platform==='win32'?'python':'python3';const r=spawnSync(bin,['apps/python-worker/voxcpm_server.py'],{stdio:'inherit'});process.exit(r.status??1);\"",
+    "voice:server": "node -e \"const fs=require('fs'),os=require('os'),path=require('path'),{spawnSync}=require('child_process');const home=os.homedir();const candidates=process.platform==='win32'?[path.join(home,'VoiceCloneProject','voice-en','Scripts','python.exe'),path.join(home,'VoiceCloneProject','voice-env','Scripts','python.exe'),'python']:[path.join(home,'VoiceCloneProject','voice-en','bin','python'),path.join(home,'VoiceCloneProject','voice-env','bin','python'),'python3'];const bin=candidates.find(c=>c==='python'||c==='python3'||fs.existsSync(c));const r=spawnSync(bin,['apps/python-worker/voxcpm_server.py'],{stdio:'inherit'});process.exit(r.status??1);\"",
     "db:generate": "npm run db:generate -w @ngegame/backend",
     "db:push": "npm run db:push -w @ngegame/backend",
     "db:migrate": "npm run db:migrate -w @ngegame/backend"

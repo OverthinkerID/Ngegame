@@ -16,6 +16,7 @@ import { createStreamIntelligenceRouter } from './routes/streamIntelligenceRoute
 import { createStreamingRouter } from './routes/streamingRoutes.js';
 import { createSupervisionRouter } from './routes/supervisionRoutes.js';
 import { createSystemRouter } from './routes/systemRoutes.js';
+import { createUpdateRouter } from './routes/updateRoutes.js';
 import { createVisionRouter } from './routes/visionRoutes.js';
 import { createVoiceRouter } from './routes/voiceRoutes.js';
 import { CalibrationService } from './services/adaptation/calibrationService.js';
@@ -179,6 +180,7 @@ export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
   app.use('/api/stream-intelligence', createStreamIntelligenceRouter(streamEventService, liveCommentaryService, voicePersonalityService, chatIntelligenceService, sceneIntelligenceService, highlightService, sessionSummaryService));
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/system', createSystemRouter());
+  app.use('/api/updates', createUpdateRouter(workerClient));
   app.use(
     '/api/adaptation',
     createAdaptationRouter({

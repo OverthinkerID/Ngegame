@@ -63,6 +63,8 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
   const [queue, setQueue] = useState<SupervisionQueueItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<SupervisionAuditEntry[]>([]);
   const [objective, setObjective] = useState('Eksplorasi aman dan cek status HUD');
+  const [openAIKeyInput, setOpenAIKeyInput] = useState('');
+  const [savingKey, setSavingKey] = useState(false);
   const [confirmEmergency, setConfirmEmergency] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -461,6 +463,63 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
                 className="studio-input h-9 w-full rounded-lg px-3 text-xs"
               />
             </label>
+
+            <div className="space-y-1.5 text-xs md:col-span-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[var(--text-secondary)]">OpenAI API Key (Opsional — Disimpan Aman)</span>
+                <StatusBadge
+                  variant={providerHealth?.openaiConfigured ? 'healthy' : 'info'}
+                  label={providerHealth?.openaiConfigured ? 'Terkonfigurasi' : 'Belum Diisi'}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  type="password"
+                  value={openAIKeyInput}
+                  onChange={(e) => setOpenAIKeyInput(e.target.value)}
+                  placeholder={providerHealth?.openaiConfigured ? '•••••••••••••••• (ganti API key)' : 'sk-...'}
+                  className="studio-input h-9 min-w-[200px] flex-1 rounded-lg px-3 text-xs"
+                />
+                <button
+                  type="button"
+                  disabled={savingKey || !openAIKeyInput.trim()}
+                  onClick={() => {
+                    setSavingKey(true);
+                    void backendService
+                      .setOpenAIApiKey(openAIKeyInput)
+                      .then(() => {
+                        setOpenAIKeyInput('');
+                        onNotify?.('OpenAI API Key disimpan ke penyimpanan aman.', 'success');
+                        return loadAll();
+                      })
+                      .catch((err) => onNotify?.(err instanceof Error ? err.message : 'Gagal menyimpan API Key', 'error'))
+                      .finally(() => setSavingKey(false));
+                  }}
+                  className="inline-flex h-9 items-center rounded-lg border border-[var(--accent-primary)]/45 bg-[var(--accent-primary-soft)] px-3 text-xs font-semibold text-[var(--text-primary)] disabled:opacity-40"
+                >
+                  Simpan Kunci
+                </button>
+                {providerHealth?.openaiConfigured && (
+                  <button
+                    type="button"
+                    disabled={savingKey}
+                    onClick={() => {
+                      setSavingKey(true);
+                      void backendService
+                        .clearOpenAIApiKey()
+                        .then(() => {
+                          onNotify?.('OpenAI API Key dihapus.', 'info');
+                          return loadAll();
+                        })
+                        .finally(() => setSavingKey(false));
+                    }}
+                    className="inline-flex h-9 items-center rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 text-xs text-rose-400 disabled:opacity-40"
+                  >
+                    Hapus
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </Panel>
 

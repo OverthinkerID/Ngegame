@@ -54,10 +54,12 @@ def run_voxcpm(text: str, out_wav: str, ref_audio: str, ref_text: str) -> None:
 
     model_id = os.environ.get("VOXCPM_MODEL_ID", "openbmb/VoxCPM-0.5B")
     model = VoxCPM.from_pretrained(model_id)
+    has_ref = bool(ref_audio and os.path.isfile(ref_audio))
+    effective_prompt_text = (ref_text or "").strip() or "Halo semuanya, ini adalah contoh suara referensi."
     wav = model.generate(
         text=text,
-        prompt_wav_path=ref_audio if ref_audio else None,
-        prompt_text=ref_text if ref_text else None,
+        prompt_wav_path=ref_audio if has_ref else None,
+        prompt_text=effective_prompt_text if has_ref else None,
     )
     sf.write(out_wav, wav, 16000)
 

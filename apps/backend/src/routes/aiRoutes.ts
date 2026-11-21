@@ -14,6 +14,25 @@ export function createAIRouter(aiService = new AIBrainService()): Router {
     res.json(updated);
   });
 
+  router.post('/openai-key', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const apiKey = String(req.body?.apiKey ?? '');
+      const updated = await aiService.setOpenAIApiKey(apiKey);
+      res.json(updated);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.delete('/openai-key', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const updated = await aiService.clearOpenAIApiKey();
+      res.json(updated);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.get('/providers/health', async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const health = await aiService.getProvidersHealth();

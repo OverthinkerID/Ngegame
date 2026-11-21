@@ -12,5 +12,5 @@ export * from './types/voice.js';
 export * from './types/streaming.js';
 export * from './types/analytics.js';
 export * from './types/adaptation.js';
+export * from './types/updater.js';
 export * from './types/streamIntelligence.js';
-

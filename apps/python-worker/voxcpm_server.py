@@ -65,15 +65,18 @@ def _synthesize_wav(
     speed: float,
     ref_path: Optional[str],
     out_wav: str,
+    ref_text: Optional[str] = None,
 ) -> str:
     effective_cmd = VOXCPM_CMD
     if not effective_cmd and _has_voxcpm_package() and os.environ.get("VOXCPM_BACKEND", "auto") != "f5-tts":
         import soundfile as sf  # type: ignore[import-not-found]
         model = _get_voxcpm_model()
+        has_ref = bool(ref_path and os.path.isfile(ref_path))
+        effective_prompt_text = (ref_text or "").strip() or "Halo semuanya, ini adalah contoh suara referensi."
         wav = model.generate(
             text=text,
-            prompt_wav_path=ref_path if ref_path else None,
-            prompt_text=None,
+            prompt_wav_path=ref_path if has_ref else None,
+            prompt_text=effective_prompt_text if has_ref else None,
         )
         sample_rate = getattr(getattr(model, "tts_model", None), "sample_rate", 16000)
         sf.write(out_wav, wav, int(sample_rate))
@@ -173,6 +176,7 @@ class VoxCpmHandler(BaseHTTPRequestHandler):
         speed = float(body.get("speed") or 1.0)
         ref_b64 = body.get("reference_audio_base64")
         ref_name = str(body.get("reference_filename") or "reference.wav")
+        ref_text = str(body.get("reference_text") or body.get("prompt_text") or "").strip() or None
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ref_path: Optional[str] = None
@@ -184,7 +188,7 @@ class VoxCpmHandler(BaseHTTPRequestHandler):
 
             out_wav = os.path.join(tmpdir, "output.wav")
             try:
-                engine_used = _synthesize_wav(text, speed, ref_path, out_wav)
+                engine_used = _synthesize_wav(text, speed, ref_path, out_wav, ref_text)
                 with open(out_wav, "rb") as wf:
                     audio_b64 = base64.b64encode(wf.read()).decode("ascii")
                 self._send_json(
