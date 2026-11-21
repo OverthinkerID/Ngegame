@@ -255,6 +255,20 @@ export const backendService = {
     });
   },
 
+  async setOpenAIApiKey(apiKey: string): Promise<AIBrainConfig> {
+    return requestJson<AIBrainConfig>('/api/ai/openai-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey }),
+    });
+  },
+
+  async clearOpenAIApiKey(): Promise<AIBrainConfig> {
+    return requestJson<AIBrainConfig>('/api/ai/openai-key', {
+      method: 'DELETE',
+    });
+  },
+
   async getAIProvidersHealth(): Promise<AIProviderHealth> {
     if (window.ngegameAPI) {
       return window.ngegameAPI.getAIProvidersHealth();

@@ -8,6 +8,7 @@ import type {
 } from '@ngegame/shared';
 import { getPrismaClient, recordSystemLog } from '../../db/prisma.js';
 import { Logger } from '../../utils/logger.js';
+import { StreamCredentialStore } from '../streaming/credentialStore.js';
 import { extractJsonObject, validateAIOutput } from './actionValidator.js';
 import { buildSystemPrompt, buildUserPrompt } from './promptTemplates.js';
 import {
@@ -19,6 +20,7 @@ import {
 
 export class AIBrainService {
   private readonly logger: Logger;
+  private readonly credentialStore = new StreamCredentialStore();
   private config: AIBrainConfig;
   private sessionMemory: string[] = [];
 
@@ -34,6 +36,31 @@ export class AIBrainService {
       genre: 'Universal',
       temperature: 0.3,
     };
+    if (!process.env.OPENAI_API_KEY) {
+      void this.credentialStore.getSecret('openai-api-key').then((saved) => {
+        if (saved?.trim()) {
+          process.env.OPENAI_API_KEY = saved.trim();
+        }
+      }).catch(() => undefined);
+    }
+  }
+
+  public async setOpenAIApiKey(apiKey: string): Promise<AIBrainConfig> {
+    const clean = apiKey.trim();
+    if (!clean) {
+      throw new Error('OpenAI API Key tidak boleh kosong.');
+    }
+    await this.credentialStore.saveSecret('openai-api-key', clean);
+    process.env.OPENAI_API_KEY = clean;
+    await recordSystemLog('info', 'ai-brain', 'OpenAI API Key disimpan secara aman');
+    return this.getConfig();
+  }
+
+  public async clearOpenAIApiKey(): Promise<AIBrainConfig> {
+    await this.credentialStore.deleteSecret('openai-api-key');
+    delete process.env.OPENAI_API_KEY;
+    await recordSystemLog('info', 'ai-brain', 'OpenAI API Key dihapus dari penyimpanan aman');
+    return this.getConfig();
   }
 
   public getConfig(): AIBrainConfig {
