@@ -269,6 +269,33 @@ export interface StreamHighlightsStatusResponse {
   candidates: HighlightCandidateItem[];
 }
 
+export interface StreamSessionSummaryItem {
+  id: number;
+  sessionId: number | null;
+  gameId: string;
+  totalDurationSeconds: number;
+  importantEventsCount: number;
+  totalChatMessages: number;
+  questionsCount: number;
+  repliesApprovedCount: number;
+  moderationActionsCount: number;
+  commentaryCount: number;
+  highlightCandidatesCount: number;
+  approvedHighlightsCount: number;
+  avgBitrateKbps: number;
+  avgFps: number;
+  droppedFrames: number;
+  summaryText: string;
+  reportMarkdown: string;
+  createdAt: string;
+}
+
+export interface StreamSessionSummaryResponse {
+  latest: StreamSessionSummaryItem | null;
+  history: StreamSessionSummaryItem[];
+}
+
+
 
 
 

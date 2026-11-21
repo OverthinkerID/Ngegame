@@ -14,6 +14,7 @@ import { GameplayEventIntelligenceService } from '../services/streamIntelligence
 import { HighlightIntelligenceService } from '../services/streamIntelligence/highlightIntelligenceService.js';
 import { LiveCommentaryService } from '../services/streamIntelligence/liveCommentaryService.js';
 import { SceneIntelligenceService } from '../services/streamIntelligence/sceneIntelligenceService.js';
+import { StreamSessionSummaryService } from '../services/streamIntelligence/sessionSummaryService.js';
 import { VoicePersonalityService } from '../services/streamIntelligence/voicePersonalityService.js';
 
 export function createStreamIntelligenceRouter(
@@ -23,6 +24,7 @@ export function createStreamIntelligenceRouter(
   chatIntelligenceService = new ChatIntelligenceService(),
   sceneIntelligenceService = new SceneIntelligenceService(),
   highlightService = new HighlightIntelligenceService(),
+  sessionSummaryService = new StreamSessionSummaryService(),
 ): Router {
   const router = Router();
 
@@ -404,6 +406,28 @@ export function createStreamIntelligenceRouter(
       const format = req.query.format === 'csv' ? 'csv' : 'json';
       const payload = await highlightService.exportMetadata(format);
       res.type(format === 'csv' ? 'text/csv' : 'application/json').send(payload);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/session-summary', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const summary = await sessionSummaryService.getStatus();
+      res.json({ ok: true, ...summary });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/session-summary/generate', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const item = await sessionSummaryService.generateSummary({
+        sessionId: req.body?.sessionId !== undefined ? Number(req.body.sessionId) : undefined,
+        gameId: req.body?.gameId ? String(req.body.gameId) : undefined,
+        durationSeconds: req.body?.durationSeconds !== undefined ? Number(req.body.durationSeconds) : undefined,
+      });
+      res.status(201).json({ ok: true, summary: item });
     } catch (err) {
       next(err);
     }

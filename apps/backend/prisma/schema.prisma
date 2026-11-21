@@ -400,6 +400,30 @@ model HighlightCandidate {
   @@index([highlightScore])
 }
 
+model StreamSessionSummary {
+  id                       Int      @id @default(autoincrement())
+  sessionId                Int?
+  gameId                   String
+  totalDurationSeconds     Int      @default(0)
+  importantEventsCount     Int      @default(0)
+  totalChatMessages        Int      @default(0)
+  questionsCount           Int      @default(0)
+  repliesApprovedCount     Int      @default(0)
+  moderationActionsCount   Int      @default(0)
+  commentaryCount          Int      @default(0)
+  highlightCandidatesCount Int      @default(0)
+  approvedHighlightsCount  Int      @default(0)
+  avgBitrateKbps           Int      @default(0)
+  avgFps                   Float    @default(0)
+  droppedFrames            Int      @default(0)
+  summaryText              String
+  reportMarkdown           String
+  createdAt                DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+
 
 
 

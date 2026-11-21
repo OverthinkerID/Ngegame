@@ -31,6 +31,7 @@ import { GameplayEventIntelligenceService } from './services/streamIntelligence/
 import { HighlightIntelligenceService } from './services/streamIntelligence/highlightIntelligenceService.js';
 import { LiveCommentaryService } from './services/streamIntelligence/liveCommentaryService.js';
 import { SceneIntelligenceService } from './services/streamIntelligence/sceneIntelligenceService.js';
+import { StreamSessionSummaryService } from './services/streamIntelligence/sessionSummaryService.js';
 import { VoicePersonalityService } from './services/streamIntelligence/voicePersonalityService.js';
 import { SupervisionService } from './services/supervision/supervisionService.js';
 import { VisionService } from './services/vision/visionService.js';
@@ -173,8 +174,9 @@ export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
   const chatIntelligenceService = new ChatIntelligenceService(broadcastWs);
   const sceneIntelligenceService = new SceneIntelligenceService(broadcastWs);
   const highlightService = new HighlightIntelligenceService(broadcastWs);
+  const sessionSummaryService = new StreamSessionSummaryService();
   app.use('/api/streaming', createStreamingRouter());
-  app.use('/api/stream-intelligence', createStreamIntelligenceRouter(streamEventService, liveCommentaryService, voicePersonalityService, chatIntelligenceService, sceneIntelligenceService, highlightService));
+  app.use('/api/stream-intelligence', createStreamIntelligenceRouter(streamEventService, liveCommentaryService, voicePersonalityService, chatIntelligenceService, sceneIntelligenceService, highlightService, sessionSummaryService));
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/system', createSystemRouter());
   app.use(

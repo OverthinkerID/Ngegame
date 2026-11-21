@@ -5,9 +5,10 @@ import { GameplayEventIntelligenceService } from '../src/services/streamIntellig
 import { LiveCommentaryService } from '../src/services/streamIntelligence/liveCommentaryService.js';
 import { HighlightIntelligenceService } from '../src/services/streamIntelligence/highlightIntelligenceService.js';
 import { SceneIntelligenceService } from '../src/services/streamIntelligence/sceneIntelligenceService.js';
+import { StreamSessionSummaryService } from '../src/services/streamIntelligence/sessionSummaryService.js';
 import { VoicePersonalityService } from '../src/services/streamIntelligence/voicePersonalityService.js';
 
-describe('Phase 16.2–16.7: Stream Intelligence Engine', () => {
+describe('Phase 16.2–16.8: Stream Intelligence Engine', () => {
   it('rejects unverified controller-only claims and detects verified Stardew Valley events with WS broadcast', async () => {
     const emitted: Array<{ eventType: string; payload: unknown }> = [];
     const service = new GameplayEventIntelligenceService((eventType, payload) => {
@@ -309,5 +310,24 @@ describe('Phase 16.2–16.7: Stream Intelligence Engine', () => {
 
     const csv = await hlWithRec.exportMetadata('csv');
     assert.ok(csv.includes('highlightScore'));
+  });
+
+  it('generates and persists StreamSessionSummary aggregating events, commentary, chat, highlights, and performance', async () => {
+    const summarySvc = new StreamSessionSummaryService();
+    const summary = await summarySvc.generateSummary({
+      gameId: 'stardew-valley',
+      durationSeconds: 1800,
+    });
+    assert.equal(summary.gameId, 'stardew-valley');
+    assert.equal(summary.totalDurationSeconds, 1800);
+    assert.ok(summary.importantEventsCount >= 1);
+    assert.ok(summary.commentaryCount >= 1);
+    assert.ok(summary.totalChatMessages >= 1);
+    assert.ok(summary.highlightCandidatesCount >= 1);
+    assert.ok(summary.reportMarkdown.includes('Laporan Sesi Streaming'));
+
+    const status = await summarySvc.getStatus(5);
+    assert.ok(status.latest);
+    assert.ok(status.history.length >= 1);
   });
 });
