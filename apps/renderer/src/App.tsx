@@ -7,6 +7,7 @@ import type {
   SupervisionState,
   SystemHealthResponse,
   SystemLogEntry,
+  UpdateState,
 } from '@ngegame/shared';
 import { GlobalStatusBar } from './components/layout/GlobalStatusBar.js';
 import { Sidebar } from './components/layout/Sidebar.js';
@@ -24,7 +25,7 @@ import { GameLibraryPage } from './pages/GameLibraryPage.js';
 import { LiveStreamingPage } from './pages/LiveStreamingPage.js';
 import { MainDashboardPage } from './pages/MainDashboardPage.js';
 import { SessionHistoryPage } from './pages/SessionHistoryPage.js';
-import { SettingsPage } from './pages/SettingsPage.js';
+import { SettingsPage, type SettingsTab } from './pages/SettingsPage.js';
 import { SystemMonitorPage } from './pages/SystemMonitorPage.js';
 import { VisionMonitorPage } from './pages/VisionMonitorPage.js';
 import { VoiceStudioPage } from './pages/VoiceStudioPage.js';
@@ -41,6 +42,8 @@ interface ToastState {
 
 function DashboardShell(): React.JSX.Element {
   const [activePage, setActivePage] = useState<PageId>('dashboard');
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('appearance');
+  const [updateState, setUpdateState] = useState<UpdateState | null>(null);
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [health, setHealth] = useState<SystemHealthResponse | null>(null);
   const [supervision, setSupervision] = useState<SupervisionState | null>(null);
@@ -160,6 +163,8 @@ function DashboardShell(): React.JSX.Element {
 
   useEffect(() => {
     void refreshBackendData(true);
+    void backendService.getUpdaterState().then(setUpdateState).catch(() => undefined);
+    return backendService.onUpdaterStateChanged((st) => setUpdateState(st));
   }, [refreshBackendData]);
 
   useEffect(() => {
@@ -212,7 +217,15 @@ function DashboardShell(): React.JSX.Element {
           />
         );
       case 'settings':
-        return <SettingsPage appInfo={appInfo} logs={logs} onNavigate={setActivePage} />;
+        return (
+          <SettingsPage
+            appInfo={appInfo}
+            logs={logs}
+            initialTab={settingsTab}
+            onNavigate={setActivePage}
+            onNotify={showNotify}
+          />
+        );
     }
   };
 
@@ -245,6 +258,28 @@ function DashboardShell(): React.JSX.Element {
         />
 
         <main className="flex-1 overflow-y-auto p-6">
+          {updateState?.updateAvailable && (
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--accent-primary)]/40 bg-[var(--accent-primary-soft)] px-4 py-3 text-xs">
+              <div>
+                <span className="font-semibold text-[var(--text-primary)]">
+                  Pembaruan v{updateState.latestVersion} tersedia
+                </span>{' '}
+                <span className="text-[var(--text-secondary)]">
+                  ({updateState.status === 'downloaded' ? 'Siap dipasang & restart' : 'Siap diunduh dari GitHub Releases'})
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSettingsTab('updates');
+                  setActivePage('settings');
+                }}
+                className="rounded-lg border border-[var(--accent-primary)] bg-[var(--surface-card)] px-3 py-1.5 font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+              >
+                Buka Pembaruan
+              </button>
+            </div>
+          )}
           {error && (
             <div className="mb-5">
               <ErrorState message={error} onRetry={() => void refreshBackendData(false)} />

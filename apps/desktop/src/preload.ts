@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { NgegameBridgeAPI } from '@ngegame/shared';
+import type { NgegameBridgeAPI, UpdateState } from '@ngegame/shared';
 
 const api: NgegameBridgeAPI = {
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
@@ -69,6 +69,23 @@ const api: NgegameBridgeAPI = {
   getThrottlingConfig: () => ipcRenderer.invoke('analytics:throttle-get'),
   updateThrottlingConfig: (partial) => ipcRenderer.invoke('analytics:throttle-update', partial),
   exportAnalyticsReport: (format) => ipcRenderer.invoke('analytics:export', format),
+  getUpdaterState: () => ipcRenderer.invoke('updater:get-state'),
+  checkForUpdates: () => ipcRenderer.invoke('updater:check'),
+  downloadUpdate: () => ipcRenderer.invoke('updater:download'),
+  installUpdate: (options) => ipcRenderer.invoke('updater:install', options),
+  getUpdatePreferences: () => ipcRenderer.invoke('updater:get-preferences'),
+  updateUpdatePreferences: (partial) => ipcRenderer.invoke('updater:update-preferences', partial),
+  backupUserDatabase: () => ipcRenderer.invoke('updater:backup-db'),
+  restoreUserDatabase: (backupPath) => ipcRenderer.invoke('updater:restore-db', backupPath),
+  onUpdaterStateChanged: (listener: (state: UpdateState) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: UpdateState): void => {
+      listener(state);
+    };
+    ipcRenderer.on('updater:state-changed', handler);
+    return () => {
+      ipcRenderer.removeListener('updater:state-changed', handler);
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld('ngegameAPI', api);

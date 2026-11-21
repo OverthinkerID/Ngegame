@@ -53,6 +53,11 @@ import type {
   VoiceSpeakRequest,
   VoiceSpeechResult,
 } from './voice.js';
+import type {
+  UpdateInstallOptions,
+  UpdatePreferences,
+  UpdateState,
+} from './updater.js';
 import type { WorkerResponse } from './worker.js';
 
 export type { ResourceMetricsSnapshot };
@@ -125,6 +130,15 @@ export const IPC_CHANNELS = {
   ANALYTICS_THROTTLE_GET: 'analytics:throttle-get',
   ANALYTICS_THROTTLE_UPDATE: 'analytics:throttle-update',
   ANALYTICS_EXPORT: 'analytics:export',
+  UPDATER_GET_STATE: 'updater:get-state',
+  UPDATER_CHECK: 'updater:check',
+  UPDATER_DOWNLOAD: 'updater:download',
+  UPDATER_INSTALL: 'updater:install',
+  UPDATER_GET_PREFERENCES: 'updater:get-preferences',
+  UPDATER_UPDATE_PREFERENCES: 'updater:update-preferences',
+  UPDATER_BACKUP_DB: 'updater:backup-db',
+  UPDATER_RESTORE_DB: 'updater:restore-db',
+  UPDATER_STATE_CHANGED: 'updater:state-changed',
 } as const;
 
 export interface AppInfo {
@@ -206,4 +220,13 @@ export interface NgegameBridgeAPI {
   getThrottlingConfig: () => Promise<ThrottlingConfig>;
   updateThrottlingConfig: (partial: Partial<ThrottlingConfig>) => Promise<ThrottlingConfig>;
   exportAnalyticsReport: (format: 'json' | 'csv') => Promise<string>;
+  getUpdaterState: () => Promise<UpdateState>;
+  checkForUpdates: () => Promise<UpdateState>;
+  downloadUpdate: () => Promise<UpdateState>;
+  installUpdate: (options?: UpdateInstallOptions) => Promise<UpdateState>;
+  getUpdatePreferences: () => Promise<UpdatePreferences>;
+  updateUpdatePreferences: (partial: Partial<UpdatePreferences>) => Promise<UpdatePreferences>;
+  backupUserDatabase: () => Promise<{ backupPath: string | null }>;
+  restoreUserDatabase: (backupPath: string) => Promise<{ restored: boolean }>;
+  onUpdaterStateChanged?: (listener: (state: UpdateState) => void) => () => void;
 }

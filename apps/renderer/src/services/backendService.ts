@@ -669,4 +669,88 @@ export const backendService = {
     }
     return res.text();
   },
+
+  async getUpdaterState(): Promise<import('@ngegame/shared').UpdateState> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.getUpdaterState();
+    }
+    const info = await this.getAppInfo().catch(() => null);
+    return {
+      currentVersion: info?.version ?? '0.1.0',
+      latestVersion: null,
+      status: 'idle',
+      updateAvailable: false,
+      releaseNotes: null,
+      releaseDate: null,
+      progress: null,
+      lastCheckedAt: null,
+      lastBackupPath: null,
+      activeTasksBlocking: false,
+      activeTasksReason: null,
+      isPackaged: false,
+      error: 'Pemeriksaan update tersedia pada aplikasi desktop Electron.',
+      preferences: {
+        autoCheck: true,
+        autoDownload: false,
+        requireInstallConfirmation: true,
+        checkFrequency: 'startup',
+        allowPrerelease: false,
+      },
+    };
+  },
+
+  async checkForUpdates(): Promise<import('@ngegame/shared').UpdateState> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.checkForUpdates();
+    }
+    return this.getUpdaterState();
+  },
+
+  async downloadUpdate(): Promise<import('@ngegame/shared').UpdateState> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.downloadUpdate();
+    }
+    return this.getUpdaterState();
+  },
+
+  async installUpdate(
+    options?: import('@ngegame/shared').UpdateInstallOptions,
+  ): Promise<import('@ngegame/shared').UpdateState> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.installUpdate(options);
+    }
+    return this.getUpdaterState();
+  },
+
+  async updateUpdatePreferences(
+    partial: Partial<import('@ngegame/shared').UpdatePreferences>,
+  ): Promise<import('@ngegame/shared').UpdatePreferences> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.updateUpdatePreferences(partial);
+    }
+    return {
+      autoCheck: true,
+      autoDownload: false,
+      requireInstallConfirmation: true,
+      checkFrequency: 'startup',
+      allowPrerelease: false,
+      ...partial,
+    };
+  },
+
+  async backupUserDatabase(): Promise<{ backupPath: string | null }> {
+    if (window.ngegameAPI) {
+      return window.ngegameAPI.backupUserDatabase();
+    }
+    return { backupPath: null };
+  },
+
+  onUpdaterStateChanged(
+    listener: (state: import('@ngegame/shared').UpdateState) => void,
+  ): () => void {
+    if (window.ngegameAPI?.onUpdaterStateChanged) {
+      return window.ngegameAPI.onUpdaterStateChanged(listener);
+    }
+    return () => undefined;
+  },
 };
