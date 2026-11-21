@@ -339,3 +339,144 @@ model UpdateRecoveryLog {
   @@index([createdAt])
 }
 
+model StreamEvent {
+  id             Int      @id @default(autoincrement())
+  gameId         String
+  windowTitle    String
+  eventType      String
+  severity       String   @default("low")
+  title          String
+  description    String
+  confidence     Float    @default(0.5)
+  verifiedByJson String   @default("[]")
+  ocrExcerpt     String?
+  motionScore    Float    @default(0)
+  sceneLabel     String
+  metadataJson   String   @default("{}")
+  sessionId      Int?
+  visionId       Int?
+  createdAt      DateTime @default(now())
+
+  @@index([gameId, eventType, createdAt])
+  @@index([createdAt])
+}
+
+model CommentaryHistory {
+  id              Int      @id @default(autoincrement())
+  eventId         Int?
+  gameId          String
+  personality     String   @default("casual")
+  language        String   @default("id")
+  text            String
+  editedText      String?
+  priority        Int      @default(1)
+  status          String   @default("ready")
+  verifiedContext String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([gameId, createdAt])
+  @@index([status, createdAt])
+}
+
+model VoiceProfile {
+  id             String   @id
+  name           String
+  engine         String   @default("voxcpm2")
+  language       String   @default("id")
+  speed          Float    @default(1.0)
+  pitch          Float    @default(1.0)
+  emotion        String   @default("neutral")
+  expressiveness Float    @default(0.7)
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ChatInteraction {
+  id                   Int      @id @default(autoincrement())
+  platform             String
+  author               String
+  message              String
+  category             String   @default("general")
+  isSpam               Boolean  @default(false)
+  isQuestion           Boolean  @default(false)
+  proposedReply        String?
+  finalReply           String?
+  replyStatus          String   @default("none")
+  moderationSuggestion String   @default("none")
+  createdAt            DateTime @default(now())
+
+  @@index([platform, createdAt])
+  @@index([replyStatus, createdAt])
+}
+
+model ChatModerationLog {
+  id            Int      @id @default(autoincrement())
+  interactionId Int?
+  platform      String
+  author        String
+  action        String
+  reason        String
+  status        String   @default("suggested")
+  createdAt     DateTime @default(now())
+
+  @@index([status, createdAt])
+}
+
+model SceneRecommendation {
+  id                 Int      @id @default(autoincrement())
+  currentScene       String?
+  recommendedScene   String?
+  recommendedOverlay String?
+  cameraVisible      Boolean?
+  streamPhase        String   @default("idle")
+  reason             String
+  confidence         Float    @default(0.75)
+  status             String   @default("pending")
+  createdAt          DateTime @default(now())
+
+  @@index([status, createdAt])
+}
+
+model HighlightCandidate {
+  id                 Int      @id @default(autoincrement())
+  eventId            Int?
+  gameId             String
+  eventType          String
+  title              String
+  highlightScore     Float    @default(50)
+  eventTimestamp     DateTime @default(now())
+  startOffsetSeconds Int      @default(0)
+  endOffsetSeconds   Int      @default(30)
+  clipSupported      Boolean  @default(false)
+  recordingSource    String?
+  status             String   @default("pending")
+  createdAt          DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([highlightScore])
+}
+
+model StreamSessionSummary {
+  id                       Int      @id @default(autoincrement())
+  sessionId                Int?
+  gameId                   String
+  totalDurationSeconds     Int      @default(0)
+  importantEventsCount     Int      @default(0)
+  totalChatMessages        Int      @default(0)
+  questionsCount           Int      @default(0)
+  repliesApprovedCount     Int      @default(0)
+  moderationActionsCount   Int      @default(0)
+  commentaryCount          Int      @default(0)
+  highlightCandidatesCount Int      @default(0)
+  approvedHighlightsCount  Int      @default(0)
+  avgBitrateKbps           Int      @default(0)
+  avgFps                   Float    @default(0)
+  droppedFrames            Int      @default(0)
+  summaryText              String
+  reportMarkdown           String
+  createdAt                DateTime @default(now())
+
+  @@index([createdAt])
+}

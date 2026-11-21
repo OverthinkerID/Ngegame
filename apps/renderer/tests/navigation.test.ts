@@ -13,6 +13,7 @@ describe('@ngegame/renderer navigation', () => {
       'adapters',
       'adaptation-studio',
       'streaming',
+      'stream-intelligence',
       'voice',
       'analytics',
       'history',
@@ -20,10 +21,10 @@ describe('@ngegame/renderer navigation', () => {
       'settings',
     ];
 
-    assert.equal(NAV_ITEMS.length, 12);
+    assert.equal(NAV_ITEMS.length, 13);
     const actualIds = NAV_ITEMS.map((item) => item.id);
     assert.deepEqual(actualIds, expectedPages);
-    assert.equal(new Set(actualIds).size, 12);
+    assert.equal(new Set(actualIds).size, 13);
   });
 
   it('provides non-empty Indonesian labels and descriptions for every page', () => {

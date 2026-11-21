@@ -27,6 +27,7 @@ import { LiveStreamingPage } from './pages/LiveStreamingPage.js';
 import { MainDashboardPage } from './pages/MainDashboardPage.js';
 import { SessionHistoryPage } from './pages/SessionHistoryPage.js';
 import { SettingsPage, type SettingsTab } from './pages/SettingsPage.js';
+import { StreamIntelligencePage } from './pages/StreamIntelligencePage.js';
 import { SystemMonitorPage } from './pages/SystemMonitorPage.js';
 import { VisionMonitorPage } from './pages/VisionMonitorPage.js';
 import { VoiceStudioPage } from './pages/VoiceStudioPage.js';
@@ -248,6 +249,8 @@ function DashboardShell(): React.JSX.Element {
         return <GameAdaptationStudioPage onNotify={showNotify} />;
       case 'streaming':
         return <LiveStreamingPage onNotify={showNotify} />;
+      case 'stream-intelligence':
+        return <StreamIntelligencePage onNotify={showNotify} />;
       case 'voice':
         return <VoiceStudioPage onNotify={showNotify} />;
       case 'analytics':
