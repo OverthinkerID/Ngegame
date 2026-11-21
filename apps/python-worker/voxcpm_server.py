@@ -31,8 +31,15 @@ HOST = os.environ.get("VOXCPM_HOST", "127.0.0.1")
 VOXCPM_CMD = os.environ.get("VOXCPM_CMD", "").strip()
 
 
+import sys
+
+
 def _has_voxcpm_package() -> bool:
     return importlib.util.find_spec("voxcpm") is not None
+
+
+def _has_f5tts_package() -> bool:
+    return importlib.util.find_spec("f5_tts") is not None
 
 
 def _synthesize_wav(
@@ -41,17 +48,23 @@ def _synthesize_wav(
     ref_path: Optional[str],
     out_wav: str,
 ) -> str:
-    if VOXCPM_CMD:
-        cmd = shlex.split(VOXCPM_CMD) + ["--text", text, "--out", out_wav]
+    effective_cmd = VOXCPM_CMD
+    if not effective_cmd and (_has_voxcpm_package() or _has_f5tts_package()):
+        infer_script = os.path.join(os.path.dirname(__file__), "infer_voice_clone.py")
+        if os.path.isfile(infer_script):
+            effective_cmd = f"{shlex.quote(sys.executable)} {shlex.quote(infer_script)}"
+
+    if effective_cmd:
+        cmd = shlex.split(effective_cmd) + ["--text", text, "--out", out_wav]
         if ref_path:
             cmd.extend(["--ref", ref_path])
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180, check=False)
         if proc.returncode != 0:
             err_detail = (proc.stderr or proc.stdout or f"exit code {proc.returncode}").strip()
-            print(f"[voxcpm-bridge] VOXCPM_CMD failed: {err_detail}", flush=True)
-            raise RuntimeError(f"VOXCPM_CMD gagal: {err_detail[:400]}")
+            print(f"[voxcpm-bridge] Voice cloning command failed: {err_detail}", flush=True)
+            raise RuntimeError(f"Voice cloning gagal: {err_detail[:400]}")
         if not os.path.isfile(out_wav) or os.path.getsize(out_wav) == 0:
-            raise RuntimeError("VOXCPM_CMD selesai tetapi file output.wav kosong/tidak dibuat")
+            raise RuntimeError("Voice cloning selesai tetapi file output.wav kosong/tidak dibuat")
         return "voxcpm-custom-cmd"
 
     if platform.system() == "Darwin":
