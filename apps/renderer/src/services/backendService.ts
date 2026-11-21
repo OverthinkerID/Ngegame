@@ -1455,4 +1455,219 @@ export const backendService = {
       body: JSON.stringify({ durationSeconds }),
     });
   },
+
+  resolveAssetUrl(relativeOrAbsoluteUrl: string | null | undefined): string | null {
+    if (!relativeOrAbsoluteUrl) return null;
+    if (/^https?:\/\//i.test(relativeOrAbsoluteUrl) || relativeOrAbsoluteUrl.startsWith('data:')) {
+      return relativeOrAbsoluteUrl;
+    }
+    return `${BACKEND_BASE}${relativeOrAbsoluteUrl.startsWith('/') ? '' : '/'}${relativeOrAbsoluteUrl}`;
+  },
+
+  async getStorageOverview(): Promise<{
+    userDataDir: string;
+    assetCounts: Record<string, number>;
+    totalBytes: number;
+  }> {
+    return requestJson('/api/persistence/storage-info');
+  },
+
+  async listUserProfiles(): Promise<{
+    profiles: import('@ngegame/shared').UserProfileRecord[];
+    activeProfile: import('@ngegame/shared').UserProfileRecord | null;
+  }> {
+    return requestJson('/api/persistence/profiles');
+  },
+
+  async createUserProfile(input: {
+    displayName: string;
+    handle?: string;
+    bio?: string;
+    preferredLanguage?: string;
+    activate?: boolean;
+  }): Promise<import('@ngegame/shared').UserProfileRecord> {
+    const data = await requestJson<{ profile: import('@ngegame/shared').UserProfileRecord }>(
+      '/api/persistence/profiles',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+    );
+    return data.profile;
+  },
+
+  async updateUserProfile(
+    id: string,
+    patch: Partial<{
+      displayName: string;
+      handle: string;
+      bio: string;
+      preferredLanguage: string;
+      defaultGameId: string | null;
+      defaultVoiceProfileId: string | null;
+      preferences: Record<string, unknown>;
+    }>,
+  ): Promise<import('@ngegame/shared').UserProfileRecord> {
+    const data = await requestJson<{ profile: import('@ngegame/shared').UserProfileRecord }>(
+      `/api/persistence/profiles/${encodeURIComponent(id)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      },
+    );
+    return data.profile;
+  },
+
+  async activateUserProfile(id: string): Promise<import('@ngegame/shared').UserProfileRecord> {
+    const data = await requestJson<{ profile: import('@ngegame/shared').UserProfileRecord }>(
+      `/api/persistence/profiles/${encodeURIComponent(id)}/activate`,
+      { method: 'POST' },
+    );
+    return data.profile;
+  },
+
+  async deleteUserProfile(id: string): Promise<boolean> {
+    const data = await requestJson<{ deleted: boolean }>(
+      `/api/persistence/profiles/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+    );
+    return data.deleted;
+  },
+
+  async getThemeSettings(): Promise<import('@ngegame/shared').ThemeSettingsRecord> {
+    return requestJson('/api/persistence/theme');
+  },
+
+  async updateThemeSettings(
+    patch: Partial<import('@ngegame/shared').ThemeSettingsRecord>,
+  ): Promise<import('@ngegame/shared').ThemeSettingsRecord> {
+    return requestJson('/api/persistence/theme', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+  },
+
+  async getRuntimeStateMap(): Promise<Record<string, unknown>> {
+    const data = await requestJson<{ state: Record<string, unknown> }>('/api/persistence/state');
+    return data.state ?? {};
+  },
+
+  async setRuntimeState(key: string, value: unknown): Promise<void> {
+    await requestJson(`/api/persistence/state/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    });
+  },
+
+  async exportAppBackup(): Promise<import('@ngegame/shared').AppBackupPayload> {
+    return requestJson('/api/persistence/backup/export');
+  },
+
+  async importAppBackup(
+    payload: Partial<import('@ngegame/shared').AppBackupPayload>,
+  ): Promise<{ ok: boolean; summary: Record<string, number> }> {
+    return requestJson('/api/persistence/backup/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async listVoiceSamples(): Promise<import('@ngegame/shared').VoiceSampleRecord[]> {
+    const data = await requestJson<{ samples?: import('@ngegame/shared').VoiceSampleRecord[] }>(
+      '/api/voice/samples',
+    );
+    return data.samples ?? [];
+  },
+
+  async uploadVoiceSample(input: {
+    name: string;
+    language?: string;
+    durationSeconds?: number;
+    voiceProfileId?: string | null;
+    transcript?: string;
+    audioBase64: string;
+    fileName?: string;
+    mimeType?: string;
+  }): Promise<import('@ngegame/shared').VoiceSampleRecord> {
+    const data = await requestJson<{ sample: import('@ngegame/shared').VoiceSampleRecord }>(
+      '/api/voice/samples',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+    );
+    return data.sample;
+  },
+
+  async deleteVoiceSample(id: string): Promise<boolean> {
+    const data = await requestJson<{ deleted: boolean }>(
+      `/api/voice/samples/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+    );
+    return data.deleted;
+  },
+
+  async listVoiceCloneJobs(limit = 30): Promise<import('@ngegame/shared').VoiceCloneJobRecord[]> {
+    const data = await requestJson<{ jobs?: import('@ngegame/shared').VoiceCloneJobRecord[] }>(
+      `/api/voice/jobs?limit=${limit}`,
+    );
+    return data.jobs ?? [];
+  },
+
+  async deleteVoiceCloneJob(id: string): Promise<boolean> {
+    const data = await requestJson<{ deleted: boolean }>(
+      `/api/voice/jobs/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+    );
+    return data.deleted;
+  },
+
+  async upsertVoiceProfile(input: {
+    id?: string;
+    name: string;
+    description?: string;
+    engine?: import('@ngegame/shared').TTSEngineType;
+    style?: import('@ngegame/shared').VoiceSpeakingStyle;
+    defaultEmotion?: import('@ngegame/shared').VoiceEmotion;
+    defaultSampleId?: string | null;
+  }): Promise<VoiceProfile> {
+    const data = await requestJson<{ profile: VoiceProfile }>('/api/voice/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    return data.profile;
+  },
+
+  async getVisionSession(): Promise<import('@ngegame/shared').VisionSessionRecord> {
+    return requestJson('/api/vision/session');
+  },
+
+  async updateVisionSession(patch: {
+    gameId?: string | null;
+    captureSource?: string;
+    targetWindow?: string;
+    overlayEnabled?: boolean;
+    samplingIntervalMs?: number;
+  }): Promise<import('@ngegame/shared').VisionSessionRecord> {
+    return requestJson('/api/vision/session', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+  },
+
+  async clearVisionSnapshot(): Promise<import('@ngegame/shared').VisionSessionRecord> {
+    return requestJson('/api/vision/snapshot', { method: 'DELETE' });
+  },
+
+  async refreshSteamMetadata(): Promise<{ updated: number; games: SteamGameRecord[] }> {
+    return requestJson('/api/steam/refresh-metadata', { method: 'POST' });
+  },
 };

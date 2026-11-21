@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FolderPlus, Info, Play, RefreshCw, Search, Square, Trash2, X } from 'lucide-react';
+import {
+  FolderPlus,
+  Image as ImageIcon,
+  Info,
+  LayoutGrid,
+  List,
+  Play,
+  RefreshCw,
+  Search,
+  Square,
+  Trash2,
+  X,
+} from 'lucide-react';
 import type {
   SteamGameCompatibility,
   SteamGameRecord,
@@ -12,6 +24,7 @@ import { EmptyState, ErrorState } from '../components/ui/FeedbackComponents.js';
 import { Panel } from '../components/ui/Panel.js';
 import { StatCard } from '../components/ui/StatCard.js';
 import { StatusBadge } from '../components/ui/StatusBadge.js';
+import { useAppState } from '../context/AppStateContext.js';
 import { backendService } from '../services/backendService.js';
 import { GUIDE_URLS, parseFriendlyError } from '../utils/guideHelper.js';
 
@@ -23,8 +36,16 @@ function formatBytes(bytes: number): string {
   return `${mb.toFixed(0)} MB`;
 }
 
-function steamHeaderUrl(appId: number): string {
-  return ['https:/', 'shared.fastly.steamstatic.com', 'store_item_assets', 'steam', 'apps', String(appId), 'header.jpg'].join('/');
+function steamFallbackHeaderUrl(appId: number): string {
+  return [
+    'https:/',
+    'shared.fastly.steamstatic.com',
+    'store_item_assets',
+    'steam',
+    'apps',
+    String(appId),
+    'header.jpg',
+  ].join('/');
 }
 
 const COMPAT_OPTIONS: SelectOption<'all' | SteamGameCompatibility>[] = [
@@ -33,6 +54,12 @@ const COMPAT_OPTIONS: SelectOption<'all' | SteamGameCompatibility>[] = [
   { value: 'experimental', label: 'Eksperimental' },
   { value: 'unsupported', label: 'Tidak Didukung' },
   { value: 'unknown', label: 'Tidak Diketahui' },
+];
+
+const SORT_OPTIONS: SelectOption<'name' | 'status' | 'size'>[] = [
+  { value: 'name', label: 'Urutkan: Nama (A-Z)' },
+  { value: 'status', label: 'Urutkan: Terpasang & Aktif' },
+  { value: 'size', label: 'Urutkan: Ukuran Terbesar' },
 ];
 
 interface GameLibraryPageProps {
@@ -49,16 +76,17 @@ export function GameLibraryPage({
   onNotify,
   onGamesUpdated,
 }: GameLibraryPageProps): React.JSX.Element {
+  const { libraryState, setLibraryState } = useAppState();
   const [status, setStatus] = useState<SteamInstallationStatus | null>(null);
   const [games, setGames] = useState<SteamGameRecord[]>([]);
   const [manualPaths, setManualPaths] = useState<string[]>([]);
   const [manualInput, setManualInput] = useState('');
   const [scannerDiag, setScannerDiag] = useState<SteamScannerDiagnostics | null>(null);
   const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
-  const [query, setQuery] = useState('');
   const [compatFilter, setCompatFilter] = useState<'all' | SteamGameCompatibility>('all');
   const [selectedGame, setSelectedGame] = useState<SteamGameRecord | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshingMeta, setRefreshingMeta] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadSteamData = useCallback(async () => {
@@ -97,11 +125,11 @@ export function GameLibraryPage({
       setGames(res.games);
       onGamesUpdated?.(res.games);
       if (res.installation.installed) {
-        onNotify?.(`Pemindaian selesai: ${res.games.length} game disimpan ke SQLite.`, 'success');
+        onNotify?.(`Pemindaian selesai: ${res.games.length} game tersimpan di SQLite.`, 'success');
       } else {
         onNotify?.(
-          'Instalasi Steam belum terdeteksi di sistem ini.',
-          'error',
+          'Instalasi Steam belum terdeteksi; data lama tetap dipertahankan.',
+          'info',
           GUIDE_URLS.steam,
           'Panduan Steam',
         );
@@ -112,6 +140,22 @@ export function GameLibraryPage({
       onNotify?.(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefreshMetadata = async (): Promise<void> => {
+    setRefreshingMeta(true);
+    try {
+      const res = await backendService.refreshSteamMetadata();
+      setGames(res.games);
+      setFailedImages({});
+      onGamesUpdated?.(res.games);
+      onNotify?.(`Metadata & artwork lokal diperbarui (${res.updated} game).`, 'success');
+    } catch (err) {
+      const friendly = parseFriendlyError(err, 'Gagal memperbarui metadata artwork.');
+      onNotify?.(friendly.message, 'error');
+    } finally {
+      setRefreshingMeta(false);
     }
   };
 
@@ -141,46 +185,68 @@ export function GameLibraryPage({
     }
   };
 
-  const filtered = games.filter((game) => {
-    const matchesQuery =
-      game.name.toLowerCase().includes(query.toLowerCase()) ||
-      String(game.appId).includes(query.trim());
-    const matchesCompat =
-      compatFilter === 'all' || game.compatibility === compatFilter;
-    return matchesQuery && matchesCompat;
-  });
+  const filtered = games
+    .filter((game) => {
+      const q = libraryState.searchQuery.toLowerCase();
+      const matchesQuery =
+        game.name.toLowerCase().includes(q) || String(game.appId).includes(q.trim());
+      const matchesCompat =
+        compatFilter === 'all' || game.compatibility === compatFilter;
+      return matchesQuery && matchesCompat;
+    })
+    .sort((a, b) => {
+      if (libraryState.sortBy === 'size') return b.sizeOnDiskBytes - a.sizeOnDiskBytes;
+      if (libraryState.sortBy === 'status') {
+        const score = (g: SteamGameRecord) =>
+          (g.isRunning ? 4 : 0) + (g.installed !== false ? 2 : 0);
+        return score(b) - score(a) || a.name.localeCompare(b.name);
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+  const lastScannedIso =
+    games.length > 0
+      ? games.reduce(
+          (latest, g) => (g.lastScannedAt > latest ? g.lastScannedAt : latest),
+          games[0]!.lastScannedAt,
+        )
+      : null;
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-base font-semibold text-[var(--text-primary)]">Pustaka Game Steam</h2>
         <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-          Deteksi instalasi Steam lokal, kelola kompatibilitas adaptor, dan jalankan game secara aman.
+          Hasil scan tersimpan permanen di SQLite dengan cache artwork lokal di userData agar tetap tampil saat Steam offline.
         </p>
       </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           label="Instalasi Steam"
-          value={status?.installed ? 'Terdeteksi' : 'Belum Terdeteksi'}
-          meta={status?.steamPath ?? 'Pastikan Steam terpasang atau atur STEAM_PATH'}
+          value={status?.installed ? 'Terdeteksi' : 'Offline / Cache'}
+          meta={status?.steamPath ?? 'Menampilkan data tersimpan dari SQLite'}
           icon={<SteamLogo className="h-4 w-4" />}
           badge={
             <StatusBadge
               variant={status?.installed ? 'healthy' : 'warning'}
-              label={status?.installed ? 'Terpasang' : 'Tidak Ditemukan'}
+              label={status?.installed ? 'Terpasang' : 'Mode Cache'}
             />
           }
         />
         <StatCard
           label="Direktori Pustaka"
           value={`${status?.libraryPaths.length ?? 0} Lokasi`}
-          meta={status?.platform ? `Platform: ${status.platform}` : 'Menunggu pemeriksaan'}
+          meta={
+            lastScannedIso
+              ? `Terakhir dipindai: ${new Date(lastScannedIso).toLocaleString('id-ID')}`
+              : 'Belum pernah dipindai'
+          }
         />
         <StatCard
           label="Game Tersimpan (SQLite)"
           value={`${games.length} Game`}
-          meta={`${games.filter((g) => g.isRunning).length} sedang berjalan`}
+          meta={`${games.filter((g) => g.installed !== false).length} terpasang • ${games.filter((g) => g.isRunning).length} berjalan`}
         />
       </section>
 
@@ -214,7 +280,7 @@ export function GameLibraryPage({
                 .then((paths) => {
                   setManualPaths(paths);
                   setManualInput('');
-                  onNotify?.('Lokasi pustaka manual ditambahkan. Klik Pindai Pustaka untuk memuat game.', 'success');
+                  onNotify?.('Lokasi pustaka manual ditambahkan. Klik Rescan untuk memuat game.', 'success');
                 })
                 .catch((err) => {
                   const friendly = parseFriendlyError(err, 'Gagal menambahkan lokasi pustaka.');
@@ -268,15 +334,17 @@ export function GameLibraryPage({
 
       <Panel
         title="Daftar Game Lokal"
-        subtitle="Dipindai dari berkas manifes appmanifest_*.acf di direktori Steam."
+        subtitle="Tampilan Gaming Studio dengan cache artwork userData dan status instalasi."
         action={
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-[var(--text-muted)]" />
               <input
                 type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                value={libraryState.searchQuery}
+                onChange={(e) =>
+                  setLibraryState((prev) => ({ ...prev, searchQuery: e.target.value }))
+                }
                 placeholder="Cari judul atau AppID..."
                 className="studio-input h-9 rounded-lg pl-8 pr-3 text-xs placeholder:text-[var(--text-muted)]"
               />
@@ -286,8 +354,54 @@ export function GameLibraryPage({
               value={compatFilter}
               options={COMPAT_OPTIONS}
               onChange={setCompatFilter}
+              className="w-40"
+            />
+
+            <AppSelect
+              value={libraryState.sortBy}
+              options={SORT_OPTIONS}
+              onChange={(sortBy) =>
+                setLibraryState((prev) => ({ ...prev, sortBy }))
+              }
               className="w-44"
             />
+
+            <div className="inline-flex rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-0.5">
+              <button
+                type="button"
+                aria-label="Tampilan Grid"
+                onClick={() => setLibraryState((prev) => ({ ...prev, viewMode: 'grid' }))}
+                className={`rounded-md p-1.5 ${
+                  libraryState.viewMode === 'grid'
+                    ? 'bg-[var(--accent-primary-soft)] text-[var(--text-primary)]'
+                    : 'text-[var(--text-muted)]'
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label="Tampilan List"
+                onClick={() => setLibraryState((prev) => ({ ...prev, viewMode: 'list' }))}
+                className={`rounded-md p-1.5 ${
+                  libraryState.viewMode === 'list'
+                    ? 'bg-[var(--accent-primary-soft)] text-[var(--text-primary)]'
+                    : 'text-[var(--text-muted)]'
+                }`}
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void handleRefreshMetadata()}
+              disabled={refreshingMeta || games.length === 0}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50"
+            >
+              <ImageIcon className={`h-3.5 w-3.5 ${refreshingMeta ? 'animate-pulse' : ''}`} />
+              Refresh Artwork
+            </button>
 
             <button
               type="button"
@@ -296,7 +410,7 @@ export function GameLibraryPage({
               className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--accent-primary)]/45 bg-[var(--accent-primary-soft)] px-3 text-xs font-semibold text-[var(--text-primary)] hover:opacity-90 disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-              Pindai Pustaka
+              Rescan Pustaka
             </button>
           </div>
         }
@@ -307,111 +421,214 @@ export function GameLibraryPage({
             title={games.length === 0 ? 'Belum Ada Game Steam' : 'Tidak Ada Hasil Pencarian'}
             description={
               games.length === 0
-                ? 'Tekan "Pindai Pustaka" untuk membaca instalasi Steam lokal Anda.'
+                ? 'Tekan "Rescan Pustaka" untuk membaca instalasi Steam lokal Anda.'
                 : 'Coba ubah kata kunci pencarian atau filter status kompatibilitas.'
             }
           />
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {filtered.map((game) => (
-              <article
-                key={game.appId}
-                className="flex flex-col justify-between overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
-              >
-                <div>
-                  {/* Artwork Header Steam dengan fallback ikon */}
-                  <div className="relative h-32 w-full overflow-hidden border-b border-[var(--border-subtle)] bg-[var(--bg-main)]">
-                    {!failedImages[game.appId] ? (
-                      <img
-                        src={steamHeaderUrl(game.appId)}
-                        alt={game.name}
-                        loading="lazy"
-                        onError={() =>
-                          setFailedImages((prev) => ({ ...prev, [game.appId]: true }))
-                        }
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center gap-2 text-xs text-[var(--text-muted)]">
-                        <SteamLogo className="h-7 w-7 opacity-80" />
-                        <span>{game.name}</span>
-                      </div>
-                    )}
-                    <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5">
-                      {game.isRunning && (
-                        <StatusBadge
-                          variant="healthy"
-                          label={`Berjalan${game.pid ? ` (${game.pid})` : ''}`}
-                          pulse={true}
+        ) : libraryState.viewMode === 'list' ? (
+          <div className="space-y-2">
+            {filtered.map((game) => {
+              const coverSrc =
+                backendService.resolveAssetUrl(game.artworkUrl) ??
+                steamFallbackHeaderUrl(game.appId);
+              const isInstalled = game.installed !== false;
+              return (
+                <div
+                  key={game.appId}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="h-14 w-24 shrink-0 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-main)]">
+                      {!failedImages[game.appId] ? (
+                        <img
+                          src={coverSrc}
+                          alt={game.name}
+                          onError={() =>
+                            setFailedImages((prev) => ({ ...prev, [game.appId]: true }))
+                          }
+                          className="h-full w-full object-cover"
                         />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <SteamLogo className="h-5 w-5 opacity-70" />
+                        </div>
                       )}
-                      <StatusBadge
-                        variant={
-                          game.compatibility === 'verified'
-                            ? 'healthy'
-                            : game.compatibility === 'experimental'
-                              ? 'warning'
-                              : game.compatibility === 'unsupported'
-                                ? 'offline'
-                                : 'neutral'
-                        }
-                        label={game.compatibility}
-                      />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                        {game.name}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+                        <span className="tabular-nums">AppID {game.appId}</span>
+                        <span>• {formatBytes(game.sizeOnDiskBytes)}</span>
+                        <span>• {isInstalled ? 'Terpasang' : 'Tidak Terpasang'}</span>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="p-4 pb-2">
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                      {game.name}
-                    </h3>
-                    <p className="mt-0.5 tabular-nums text-xs text-[var(--text-secondary)]">
-                      AppID {game.appId} • {formatBytes(game.sizeOnDiskBytes)}
-                    </p>
-                    <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                      {game.compatibilityReason}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedGame(game)}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  >
-                    <Info className="h-3.5 w-3.5" /> Detail
-                  </button>
-
                   <div className="flex items-center gap-2">
+                    <StatusBadge
+                      variant={
+                        game.compatibility === 'verified'
+                          ? 'healthy'
+                          : game.compatibility === 'experimental'
+                            ? 'warning'
+                            : game.compatibility === 'unsupported'
+                              ? 'offline'
+                              : 'neutral'
+                      }
+                      label={game.compatibility}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSelectedGame(game)}
+                      className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-main)] px-2.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    >
+                      <Info className="h-3.5 w-3.5" /> Detail
+                    </button>
                     {game.isRunning ? (
                       <button
                         type="button"
                         onClick={() => void handleStop(game)}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 text-xs font-medium text-rose-500 hover:bg-rose-500/25"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 text-xs font-medium text-rose-500"
                       >
-                        <Square className="h-3 w-3" />
-                        Hentikan
+                        <Square className="h-3 w-3" /> Hentikan
                       </button>
                     ) : (
                       <button
                         type="button"
-                        disabled={game.compatibility === 'unsupported'}
+                        disabled={!isInstalled || game.compatibility === 'unsupported'}
                         onClick={() => void handleLaunch(game)}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 text-xs font-medium text-emerald-500 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 text-xs font-medium text-emerald-500 disabled:opacity-40"
                       >
-                        <Play className="h-3 w-3" />
-                        Jalankan
+                        <Play className="h-3 w-3" /> Jalankan
                       </button>
                     )}
                   </div>
                 </div>
-              </article>
-            ))}
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((game) => {
+              const coverSrc =
+                backendService.resolveAssetUrl(game.artworkUrl) ??
+                steamFallbackHeaderUrl(game.appId);
+              const isInstalled = game.installed !== false;
+              return (
+                <article
+                  key={game.appId}
+                  className="group flex flex-col justify-between overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] transition-all hover:border-[var(--accent-primary)]/50 hover:shadow-lg"
+                >
+                  <div>
+                    <div className="relative aspect-[16/9] w-full overflow-hidden border-b border-[var(--border-subtle)] bg-gradient-to-br from-[#121820] to-[#0a0e09]">
+                      {!failedImages[game.appId] ? (
+                        <img
+                          src={coverSrc}
+                          alt={game.name}
+                          loading="lazy"
+                          onError={() =>
+                            setFailedImages((prev) => ({ ...prev, [game.appId]: true }))
+                          }
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-[#161e29] to-[#0c1117] px-4 text-center">
+                          <SteamLogo className="h-8 w-8 text-[var(--accent-primary)] opacity-80" />
+                          <span className="line-clamp-1 text-xs font-semibold text-[var(--text-secondary)]">
+                            {game.name}
+                          </span>
+                        </div>
+                      )}
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
+                      <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5">
+                        <span
+                          className={`rounded-md px-2 py-0.5 text-[10px] font-semibold backdrop-blur-xs ${
+                            isInstalled
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          }`}
+                        >
+                          {isInstalled ? 'Terpasang' : 'Tidak Terpasang'}
+                        </span>
+                      </div>
+                      <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5">
+                        {game.isRunning && (
+                          <StatusBadge
+                            variant="healthy"
+                            label={`Berjalan${game.pid ? ` (${game.pid})` : ''}`}
+                            pulse={true}
+                          />
+                        )}
+                        <StatusBadge
+                          variant={
+                            game.compatibility === 'verified'
+                              ? 'healthy'
+                              : game.compatibility === 'experimental'
+                                ? 'warning'
+                                : game.compatibility === 'unsupported'
+                                  ? 'offline'
+                                  : 'neutral'
+                          }
+                          label={game.compatibility}
+                        />
+                      </div>
+                      <div className="absolute bottom-2.5 left-3 right-3">
+                        <h3 className="truncate text-sm font-bold text-white drop-shadow">
+                          {game.name}
+                        </h3>
+                        <p className="tabular-nums text-[11px] text-slate-200/85">
+                          AppID {game.appId} • {formatBytes(game.sizeOnDiskBytes)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 pb-2">
+                      <p className="line-clamp-2 text-xs text-[var(--text-secondary)]">
+                        {game.compatibilityReason}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] px-3.5 py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedGame(game)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    >
+                      <Info className="h-3.5 w-3.5" /> Detail
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      {game.isRunning ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleStop(game)}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 text-xs font-medium text-rose-500 hover:bg-rose-500/25"
+                        >
+                          <Square className="h-3 w-3" />
+                          Hentikan
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!isInstalled || game.compatibility === 'unsupported'}
+                          onClick={() => void handleLaunch(game)}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 text-xs font-medium text-emerald-500 hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Play className="h-3 w-3" />
+                          Jalankan
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </Panel>
 
-      {/* Modal Detail Game */}
       {selectedGame && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-xs"
@@ -438,6 +655,12 @@ export function GameLibraryPage({
             </div>
 
             <div className="mt-4 space-y-2.5 text-xs">
+              <div className="flex justify-between rounded-lg bg-[var(--bg-secondary)] px-3 py-2">
+                <span className="text-[var(--text-secondary)]">Status Instalasi</span>
+                <span className="text-[var(--text-primary)]">
+                  {selectedGame.installed !== false ? 'Terpasang' : 'Tidak Terpasang'}
+                </span>
+              </div>
               <div className="flex justify-between rounded-lg bg-[var(--bg-secondary)] px-3 py-2">
                 <span className="text-[var(--text-secondary)]">Ukuran Disk</span>
                 <span className="tabular-nums text-[var(--text-primary)]">

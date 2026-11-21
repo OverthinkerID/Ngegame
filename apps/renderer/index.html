@@ -12,6 +12,23 @@
     />
   </head>
   <body>
+    <script>
+      (function () {
+        try {
+          var mode = localStorage.getItem('ngegame-theme-mode') || 'dark';
+          var raw = localStorage.getItem('ngegame-theme-snapshot');
+          document.documentElement.setAttribute('data-theme', mode === 'light' ? 'light' : 'dark');
+          if (raw) {
+            var snap = JSON.parse(raw);
+            if (snap && typeof snap === 'object') {
+              if (snap.accentColor) document.documentElement.style.setProperty('--accent-primary', snap.accentColor);
+              if (snap.secondaryColor) document.documentElement.style.setProperty('--accent-secondary', snap.secondaryColor);
+              if (snap.mode === 'custom' && snap.backgroundColor) document.documentElement.style.setProperty('--bg-main', snap.backgroundColor);
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

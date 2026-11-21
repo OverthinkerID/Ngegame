@@ -10,6 +10,7 @@ import { createAIRouter } from './routes/aiRoutes.js';
 import { createAnalyticsRouter } from './routes/analyticsRoutes.js';
 import { createControllerRouter } from './routes/controllerRoutes.js';
 import { createHealthRouter } from './routes/healthRoutes.js';
+import { createPersistenceRouter } from './routes/persistenceRoutes.js';
 import { createRuntimeRouter } from './routes/runtimeRoutes.js';
 import { createSteamRouter } from './routes/steamRoutes.js';
 import { createStreamIntelligenceRouter } from './routes/streamIntelligenceRoutes.js';
@@ -25,6 +26,8 @@ import { GameProfileManager } from './services/adaptation/gameProfileManager.js'
 import { PipelineDiagnosticsService } from './services/adaptation/pipelineDiagnostics.js';
 import { AIBrainService } from './services/ai/aiBrainService.js';
 import { ControllerService } from './services/controller/controllerService.js';
+import { PersistenceService } from './services/persistence/persistenceService.js';
+import { UserDataStorageService } from './services/persistence/userDataStorage.js';
 import { RuntimeOrchestratorService } from './services/runtime/runtimeOrchestrator.js';
 import { SteamManager } from './services/steam/steamManager.js';
 import { ChatIntelligenceService } from './services/streamIntelligence/chatIntelligenceService.js';
@@ -36,6 +39,7 @@ import { StreamSessionSummaryService } from './services/streamIntelligence/sessi
 import { VoicePersonalityService } from './services/streamIntelligence/voicePersonalityService.js';
 import { SupervisionService } from './services/supervision/supervisionService.js';
 import { VisionService } from './services/vision/visionService.js';
+import { VoiceStudioService } from './services/voice/voiceService.js';
 import { Logger } from './utils/logger.js';
 import { PythonWorkerClient } from './workers/pythonWorkerClient.js';
 
@@ -168,7 +172,14 @@ export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
   app.use('/api/controller', createControllerRouter(controllerService));
   app.use('/api/adapters', createAdapterRouter());
   app.use('/api/supervision', createSupervisionRouter(supervisionService));
-  app.use('/api/voice', createVoiceRouter());
+  const userDataStorage = new UserDataStorageService();
+  const persistenceService = new PersistenceService(userDataStorage);
+  const voiceService = new VoiceStudioService(
+    new Logger('voice-studio', config.logLevel),
+    userDataStorage,
+  );
+  app.use('/api/persistence', createPersistenceRouter(userDataStorage, persistenceService));
+  app.use('/api/voice', createVoiceRouter(voiceService));
   const streamEventService = new GameplayEventIntelligenceService(broadcastWs);
   const liveCommentaryService = new LiveCommentaryService(broadcastWs);
   const voicePersonalityService = new VoicePersonalityService(broadcastWs);

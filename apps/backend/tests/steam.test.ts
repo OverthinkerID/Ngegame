@@ -164,11 +164,13 @@ describe('Steam Integration (Phase 12F.2)', () => {
       assert.ok(diag);
       assert.ok(diag.staleManifests.some((m) => m.appId === 999999));
 
-      // Simulasikan uninstall Terraria (hapus manifest) -> rescan -> Terraria hilang dari SQLite
+      // Simulasikan uninstall Terraria (hapus manifest) -> rescan -> Terraria ditandai tidak terpasang (tidak dihapus paksa)
       await fs.rm(path.join(secAppsDir, 'appmanifest_105600.acf'));
       const scan2 = await manager.scanLibrary();
-      assert.equal(scan2.games.some((g) => g.appId === 105600), false);
-      assert.ok(scan2.games.some((g) => g.appId === 413150));
+      const terrariaAfter = scan2.games.find((g) => g.appId === 105600);
+      assert.ok(terrariaAfter);
+      assert.equal(terrariaAfter.installed, false);
+      assert.ok(scan2.games.some((g) => g.appId === 413150 && g.installed !== false));
 
       await manager.removeManualLibraryPath(tmpManual);
     } finally {

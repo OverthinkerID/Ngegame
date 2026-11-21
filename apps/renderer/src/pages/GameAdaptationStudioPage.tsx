@@ -40,6 +40,7 @@ import type {
 import { PageHeader } from '../components/ui/PageHeader.js';
 import { Panel as PanelCard } from '../components/ui/Panel.js';
 import { StatusBadge } from '../components/ui/StatusBadge.js';
+import { useAppState } from '../context/AppStateContext.js';
 import { backendService } from '../services/backendService.js';
 
 interface GameAdaptationStudioPageProps {
@@ -105,10 +106,31 @@ const CALIBRATION_STEP_LABELS = [
 export function GameAdaptationStudioPage({
   onNotify,
 }: GameAdaptationStudioPageProps): React.JSX.Element {
-  const [activeSection, setActiveSection] = useState<StudioSection>('selection');
+  const { adaptationState, setAdaptationState } = useAppState();
+  const activeSection = (adaptationState.activeSection as StudioSection) || 'selection';
+  const setActiveSection = (sec: StudioSection): void => {
+    setAdaptationState((prev) => ({ ...prev, activeSection: sec }));
+    void backendService.setRuntimeState('adaptation_active_section', sec).catch(() => undefined);
+  };
+  const selectedId = adaptationState.selectedId || 'stardew-valley';
+  const setSelectedId = (id: string): void => {
+    setAdaptationState((prev) => ({ ...prev, selectedId: id }));
+    void backendService.setRuntimeState('adaptation_last_selected', id).catch(() => undefined);
+  };
+  const profile = adaptationState.draftProfile;
+  const setProfile = (next: GameProfile | null): void => {
+    setAdaptationState((prev) => ({ ...prev, draftProfile: next, isDirty: Boolean(next) }));
+  };
+  const brainResult = adaptationState.brainResult;
+  const setBrainResult = (res: GameBrainCycleResult | null): void => {
+    setAdaptationState((prev) => ({ ...prev, brainResult: res }));
+  };
+  const goalOverride = adaptationState.goalOverride;
+  const setGoalOverride = (val: string): void => {
+    setAdaptationState((prev) => ({ ...prev, goalOverride: val }));
+  };
+
   const [profiles, setProfiles] = useState<GameProfile[]>([]);
-  const [selectedId, setSelectedId] = useState<string>('stardew-valley');
-  const [profile, setProfile] = useState<GameProfile | null>(null);
   const [validation, setValidation] = useState<{
     valid: boolean;
     errors: string[];
@@ -121,7 +143,6 @@ export function GameAdaptationStudioPage({
   const [profileHistory, setProfileHistory] = useState<GameProfileVersionRecord[]>([]);
   const [visionPreview, setVisionPreview] = useState<VisionAnalysisResult | null>(null);
   const [controlTestResult, setControlTestResult] = useState<ControllerExecutionResult | null>(null);
-  const [brainResult, setBrainResult] = useState<GameBrainCycleResult | null>(null);
   const [stardewCaps, setStardewCaps] = useState<{
     currentLevel: StardewCapabilityLevel;
     levels: Record<number, { title: string; capabilities: string[]; smapiNote?: string }>;
@@ -129,10 +150,9 @@ export function GameAdaptationStudioPage({
   const [importText, setImportText] = useState('');
   const [duplicateId, setDuplicateId] = useState('');
   const [duplicateName, setDuplicateName] = useState('');
-  const [goalOverride, setGoalOverride] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const loadSelectedGame = useCallback(async (gameId: string) => {
+  const loadSelectedGame = useCallback(async (gameId: string, preserveDraft = false) => {
     try {
       const [detail, cal, mem, hist] = await Promise.all([
         backendService.getGameProfile(gameId),
@@ -140,7 +160,9 @@ export function GameAdaptationStudioPage({
         backendService.listGameMemories(gameId, 30),
         backendService.getGameProfileHistory(gameId, 20).catch(() => []),
       ]);
-      setProfile(detail.profile);
+      if (!preserveDraft) {
+        setAdaptationState((prev) => ({ ...prev, draftProfile: detail.profile, isDirty: false }));
+      }
       setValidation(detail.validation);
       setCalibration(cal);
       setMemories(mem);
@@ -152,30 +174,53 @@ export function GameAdaptationStudioPage({
     } catch (err) {
       onNotify?.(err instanceof Error ? err.message : 'Gagal memuat profil game', 'error');
     }
-  }, [onNotify]);
+  }, [onNotify, setAdaptationState]);
 
   const loadAll = useCallback(async () => {
     setBusy(true);
     try {
-      const [list, diag, sDiag] = await Promise.all([
+      const [list, diag, sDiag, runtimeMap] = await Promise.all([
         backendService.listGameProfiles(),
         backendService.getAdaptationDiagnostics(),
         backendService.getSteamDiagnostics().catch(() => null),
+        backendService.getRuntimeStateMap().catch(() => ({}) as Record<string, unknown>),
       ]);
       setProfiles(list);
       setDiagnostics(diag);
       setSteamDiag(sDiag);
-      const targetId = list.some((p) => p.gameId === selectedId)
-        ? selectedId
+      const savedSelected =
+        typeof runtimeMap.adaptation_last_selected === 'string'
+          ? runtimeMap.adaptation_last_selected
+          : '';
+      const desiredId = adaptationState.selectedId || savedSelected || 'stardew-valley';
+      const targetId = list.some((p) => p.gameId === desiredId)
+        ? desiredId
         : (list[0]?.gameId ?? 'stardew-valley');
-      setSelectedId(targetId);
-      await loadSelectedGame(targetId);
+      if (typeof runtimeMap.adaptation_active_section === 'string' && adaptationState.activeSection === 'overview') {
+        setAdaptationState((prev) => ({
+          ...prev,
+          activeSection: runtimeMap.adaptation_active_section as string,
+        }));
+      }
+      setAdaptationState((prev) => ({ ...prev, selectedId: targetId }));
+      await loadSelectedGame(
+        targetId,
+        adaptationState.isDirty && adaptationState.draftProfile?.gameId === targetId,
+      );
     } catch (err) {
       onNotify?.(err instanceof Error ? err.message : 'Gagal memuat Adaptation Studio', 'error');
     } finally {
       setBusy(false);
     }
-  }, [loadSelectedGame, onNotify, selectedId]);
+  }, [
+    adaptationState.activeSection,
+    adaptationState.draftProfile?.gameId,
+    adaptationState.isDirty,
+    adaptationState.selectedId,
+    loadSelectedGame,
+    onNotify,
+    setAdaptationState,
+  ]);
 
   useEffect(() => {
     void loadAll();

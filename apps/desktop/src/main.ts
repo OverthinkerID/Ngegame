@@ -161,6 +161,7 @@ function startEmbeddedBackendIfPackaged(): void {
       BACKEND_PORT: String(activeBackendPort),
       DATABASE_URL: `file:${userDbPath}`,
       PYTHON_WORKER_PATH: workerScript,
+      NGEGAME_USER_DATA: userDataDir,
       NGEGAME_LOG_DIR: logDir,
       ...(fs.existsSync(prismaEnginePath)
         ? { PRISMA_QUERY_ENGINE_LIBRARY: prismaEnginePath }

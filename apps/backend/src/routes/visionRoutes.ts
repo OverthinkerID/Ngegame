@@ -13,6 +13,33 @@ export function createVisionRouter(visionService: VisionService): Router {
     }
   });
 
+  router.get('/session', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const session = await visionService.getSession();
+      res.json(session);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.put('/session', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const session = await visionService.updateSessionConfig(req.body ?? {});
+      res.json(session);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.delete('/snapshot', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const session = await visionService.clearSnapshot();
+      res.json(session);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.get('/windows', async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const windows = await visionService.listWindows();

@@ -1,6 +1,7 @@
-import { Database, Download, History, Info, Moon, Palette, RefreshCw, RotateCcw, Shield, Sun, XCircle } from 'lucide-react';
+import { Database, Download, History, Info, Moon, Palette, RefreshCw, RotateCcw, Shield, Sun, Trash2, Upload, User, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type {
+  AppBackupPayload,
   AppInfo,
   RuntimeCompatibilityReport,
   SystemLogEntry,
@@ -17,6 +18,7 @@ import { PageHeader } from '../components/ui/PageHeader.js';
 import { Panel } from '../components/ui/Panel.js';
 import { StatCard } from '../components/ui/StatCard.js';
 import { StatusBadge } from '../components/ui/StatusBadge.js';
+import { useAppState } from '../context/AppStateContext.js';
 import { useTheme } from '../context/ThemeContext.js';
 import { backendService } from '../services/backendService.js';
 import type { PageId, ThemeAccent } from '../types/dashboard.js';
@@ -30,7 +32,7 @@ interface SettingsPageProps {
   onNotify?: (message: string, type?: 'info' | 'success' | 'error') => void;
 }
 
-export type SettingsTab = 'appearance' | 'integrations' | 'updates' | 'history' | 'about';
+export type SettingsTab = 'profile' | 'appearance' | 'integrations' | 'updates' | 'history' | 'about';
 
 const ACCENT_OPTIONS: { id: ThemeAccent; label: string; desc: string; swatch: string }[] = [
   { id: 'violet', label: 'Studio Violet', desc: 'Ungu futuristik (#8B5CF6)', swatch: 'bg-[#8B5CF6]' },
@@ -46,8 +48,21 @@ export function SettingsPage({
   onNavigate,
   onNotify,
 }: SettingsPageProps): React.JSX.Element {
-  const { mode, setMode, accent, setAccent } = useTheme();
+  const { mode, setMode, accent, setAccent, customColors, updateCustomTheme } = useTheme();
+  const { profiles, activeProfile, refreshProfiles, switchProfile } = useAppState();
   const [tab, setTab] = useState<SettingsTab>(initialTab);
+  const [profileForm, setProfileForm] = useState({
+    displayName: activeProfile?.displayName ?? '',
+    handle: activeProfile?.handle ?? '',
+    bio: activeProfile?.bio ?? '',
+    preferredLanguage: activeProfile?.preferredLanguage ?? 'id',
+  });
+  const [newProfileName, setNewProfileName] = useState('');
+  const [storageInfo, setStorageInfo] = useState<{
+    userDataDir: string;
+    assetCounts: Record<string, number>;
+    totalBytes: number;
+  } | null>(null);
   const [updateState, setUpdateState] = useState<UpdateState | null>(null);
   const [updateHistory, setUpdateHistory] = useState<UpdateHistoryEntry[]>([]);
   const [compatReport, setCompatReport] = useState<RuntimeCompatibilityReport | null>(null);
@@ -60,12 +75,73 @@ export function SettingsPage({
   }, [initialTab]);
 
   useEffect(() => {
+    if (activeProfile) {
+      setProfileForm({
+        displayName: activeProfile.displayName,
+        handle: activeProfile.handle,
+        bio: activeProfile.bio,
+        preferredLanguage: activeProfile.preferredLanguage,
+      });
+    }
+  }, [activeProfile]);
+
+  useEffect(() => {
     void backendService.getUpdaterState().then(setUpdateState).catch(() => undefined);
     void backendService.getUpdateHistory(10).then(setUpdateHistory).catch(() => undefined);
     void backendService.getUpdateCompatibility().then(setCompatReport).catch(() => undefined);
     void backendService.getUpdateRecoveryLogs(10).then(setRecoveryLogs).catch(() => undefined);
+    void backendService.getStorageOverview().then(setStorageInfo).catch(() => undefined);
     return backendService.onUpdaterStateChanged((st) => setUpdateState(st));
   }, []);
+
+  const handleSaveProfile = async (): Promise<void> => {
+    if (!activeProfile) return;
+    await backendService.updateUserProfile(activeProfile.id, profileForm);
+    await refreshProfiles();
+    onNotify?.('Profil pengguna berhasil disimpan ke SQLite.', 'success');
+  };
+
+  const handleCreateProfile = async (): Promise<void> => {
+    if (!newProfileName.trim()) return;
+    await backendService.createUserProfile({
+      displayName: newProfileName.trim(),
+      activate: true,
+    });
+    setNewProfileName('');
+    await refreshProfiles();
+    onNotify?.('Profil baru dibuat & diaktifkan.', 'success');
+  };
+
+  const handleExportBackup = async (): Promise<void> => {
+    const payload = await backendService.exportAppBackup();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ngegame-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    onNotify?.('Backup JSON diekspor & salinan disimpan di userData/backups/.', 'success');
+  };
+
+  const handleImportBackup = (file: File | undefined): void => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const parsed = JSON.parse(String(reader.result ?? '{}')) as Partial<AppBackupPayload>;
+        const res = await backendService.importAppBackup(parsed);
+        await refreshProfiles();
+        onNotify?.(
+          `Restore berhasil: ${res.summary.restoredProfiles ?? 0} profil, ${res.summary.restoredAdaptationProfiles ?? 0} profil game, ${res.summary.restoredGames ?? 0} game.`,
+          'success',
+        );
+      } catch (err) {
+        onNotify?.(err instanceof Error ? err.message : 'File backup JSON tidak valid.', 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const handleCheckUpdates = async (): Promise<void> => {
     setBusyUpdate(true);
@@ -129,13 +205,14 @@ export function SettingsPage({
     <div className="space-y-6">
       <PageHeader
         title="Pengaturan Aplikasi"
-        description="Konfigurasi tampilan gelap/terang, akses cepat modul AI/Suara/OBS, pembaruan aplikasi, riwayat sesi, dan tentang aplikasi."
+        description="Konfigurasi profil pengguna, tampilan gelap/terang, backup & restore data, pembaruan aplikasi, dan tentang aplikasi."
         actions={
           <div className="inline-flex flex-wrap rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1">
             {[
+              { id: 'profile' as SettingsTab, label: 'Profil', icon: User },
               { id: 'appearance' as SettingsTab, label: 'Tampilan', icon: Palette },
               { id: 'integrations' as SettingsTab, label: 'Layanan & Keamanan', icon: Shield },
-              { id: 'updates' as SettingsTab, label: 'Pembaruan', icon: Download },
+              { id: 'updates' as SettingsTab, label: 'Pembaruan & Backup', icon: Download },
               { id: 'history' as SettingsTab, label: 'Riwayat Sesi', icon: History },
               { id: 'about' as SettingsTab, label: 'Tentang', icon: Info },
             ].map((item) => {
@@ -145,7 +222,10 @@ export function SettingsPage({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setTab(item.id)}
+                  onClick={() => {
+                    setTab(item.id);
+                    void backendService.setRuntimeState('settingsTab', item.id).catch(() => undefined);
+                  }}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                     active
                       ? 'bg-[var(--accent-primary-soft)] font-semibold text-[var(--text-primary)]'
@@ -160,6 +240,121 @@ export function SettingsPage({
           </div>
         }
       />
+
+      {tab === 'profile' && (
+        <div className="space-y-6">
+          <Panel
+            title="Profil Pengguna Aktif"
+            subtitle="Perubahan profil langsung disimpan ke SQLite userData dan dimuat ulang otomatis saat aplikasi dibuka."
+            action={
+              <button
+                type="button"
+                onClick={() => void handleSaveProfile()}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3 text-xs font-semibold text-white hover:opacity-90"
+              >
+                Simpan Profil
+              </button>
+            }
+          >
+            <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-2">
+              <label className="space-y-1">
+                <span className="text-[var(--text-secondary)]">Nama Tampilan</span>
+                <input
+                  type="text"
+                  value={profileForm.displayName}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, displayName: e.target.value }))}
+                  className="studio-input h-9 w-full rounded-lg px-3 text-xs"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-[var(--text-secondary)]">Handle / Channel</span>
+                <input
+                  type="text"
+                  value={profileForm.handle}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, handle: e.target.value }))}
+                  className="studio-input h-9 w-full rounded-lg px-3 text-xs"
+                />
+              </label>
+              <label className="space-y-1 md:col-span-2">
+                <span className="text-[var(--text-secondary)]">Bio / Catatan Kreator</span>
+                <input
+                  type="text"
+                  value={profileForm.bio}
+                  onChange={(e) => setProfileForm((p) => ({ ...p, bio: e.target.value }))}
+                  className="studio-input h-9 w-full rounded-lg px-3 text-xs"
+                />
+              </label>
+            </div>
+          </Panel>
+
+          <Panel
+            title="Kelola Multi-Profil"
+            subtitle="Buat profil terpisah untuk setup game atau persona siaran yang berbeda."
+          >
+            <div className="mb-4 flex flex-wrap gap-2">
+              <input
+                type="text"
+                value={newProfileName}
+                onChange={(e) => setNewProfileName(e.target.value)}
+                placeholder="Nama profil baru..."
+                className="studio-input h-9 min-w-60 flex-1 rounded-lg px-3 text-xs"
+              />
+              <button
+                type="button"
+                disabled={!newProfileName.trim()}
+                onClick={() => void handleCreateProfile()}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--accent-primary)]/45 bg-[var(--accent-primary-soft)] px-3 text-xs font-semibold text-[var(--text-primary)] disabled:opacity-40"
+              >
+                Tambah Profil
+              </button>
+            </div>
+            <div className="space-y-2">
+              {profiles.map((prof) => (
+                <div
+                  key={prof.id}
+                  className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 text-xs ${
+                    prof.isActive
+                      ? 'border-[var(--accent-primary)] bg-[var(--accent-primary-soft)]'
+                      : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)]'
+                  }`}
+                >
+                  <div>
+                    <div className="font-semibold text-[var(--text-primary)]">
+                      {prof.displayName} {prof.handle ? `(${prof.handle})` : ''}
+                    </div>
+                    <div className="text-[11px] text-[var(--text-secondary)]">{prof.bio || 'Tanpa bio'}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {prof.isActive ? (
+                      <StatusBadge variant="healthy" label="Aktif" />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void switchProfile(prof.id)}
+                        className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2.5 py-1 text-[11px] font-medium hover:bg-[var(--surface-hover)]"
+                      >
+                        Aktifkan
+                      </button>
+                    )}
+                    {profiles.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void backendService.deleteUserProfile(prof.id).then(() => refreshProfiles())
+                        }
+                        aria-label={`Hapus ${prof.displayName}`}
+                        className="text-[var(--text-muted)] hover:text-rose-400"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </div>
+      )}
 
       {tab === 'appearance' && (
         <>
@@ -211,8 +406,8 @@ export function SettingsPage({
           </Panel>
 
           <Panel
-            title="Aksen Warna Utama"
-            subtitle="Sesuaikan warna sorotan pada navigasi, tombol utama, dan indikator aktif."
+            title="Aksen Warna Utama &amp; Kustomisasi Tema"
+            subtitle="Sesuaikan warna sorotan pada navigasi, tombol utama, warna sekunder, dan latar belakang."
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {ACCENT_OPTIONS.map((opt) => (
@@ -233,6 +428,48 @@ export function SettingsPage({
                   </div>
                 </button>
               ))}
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] pt-4 text-xs sm:grid-cols-3">
+              <label className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2">
+                <span className="text-[var(--text-secondary)]">Warna Primer / Aksen</span>
+                <input
+                  type="color"
+                  value={customColors.accentColor}
+                  onChange={(e) =>
+                    void updateCustomTheme({
+                      accentColor: e.target.value,
+                      primaryColor: e.target.value,
+                    })
+                  }
+                  className="h-7 w-10 cursor-pointer rounded border-0 bg-transparent"
+                />
+              </label>
+              <label className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2">
+                <span className="text-[var(--text-secondary)]">Warna Sekunder</span>
+                <input
+                  type="color"
+                  value={customColors.secondaryColor}
+                  onChange={(e) =>
+                    void updateCustomTheme({ secondaryColor: e.target.value })
+                  }
+                  className="h-7 w-10 cursor-pointer rounded border-0 bg-transparent"
+                />
+              </label>
+              <label className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2">
+                <span className="text-[var(--text-secondary)]">Latar Kustom</span>
+                <input
+                  type="color"
+                  value={customColors.backgroundColor}
+                  onChange={(e) =>
+                    void updateCustomTheme({
+                      mode: 'custom',
+                      backgroundColor: e.target.value,
+                    })
+                  }
+                  className="h-7 w-10 cursor-pointer rounded border-0 bg-transparent"
+                />
+              </label>
             </div>
           </Panel>
         </>
@@ -383,23 +620,45 @@ export function SettingsPage({
           </Panel>
 
           <Panel
-            title="Preferensi Pembaruan &amp; Keamanan Data"
-            subtitle="Default aman: cek otomatis aktif, unduh otomatis nonaktif, dan konfirmasi instalasi aktif."
+            title="Preferensi Pembaruan &amp; Backup / Restore Data"
+            subtitle={
+              storageInfo
+                ? `Lokasi userData: ${storageInfo.userDataDir} (${Object.values(storageInfo.assetCounts).reduce((a, b) => a + b, 0)} file asset)`
+                : 'Default aman: cek otomatis aktif, unduh otomatis nonaktif, dan konfirmasi instalasi aktif.'
+            }
             action={
-              <button
-                type="button"
-                onClick={() =>
-                  void backendService.backupUserDatabase().then((res) => {
-                    onNotify?.(
-                      res.backupPath ? `Backup SQLite disimpan: ${res.backupPath}` : 'Database lokal belum dibuat.',
-                      res.backupPath ? 'success' : 'info',
-                    );
-                  })
-                }
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-xs text-[var(--text-primary)]"
-              >
-                <Database className="h-3.5 w-3.5" /> Backup SQLite Sekarang
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleExportBackup()}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--accent-primary)]/45 bg-[var(--accent-primary-soft)] px-3 text-xs font-semibold text-[var(--text-primary)]"
+                >
+                  <Download className="h-3.5 w-3.5" /> Ekspor Backup JSON
+                </button>
+                <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-hover)]">
+                  <Upload className="h-3.5 w-3.5" /> Restore JSON
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={(e) => handleImportBackup(e.target.files?.[0])}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void backendService.backupUserDatabase().then((res) => {
+                      onNotify?.(
+                        res.backupPath ? `Backup SQLite disimpan: ${res.backupPath}` : 'Database lokal belum dibuat.',
+                        res.backupPath ? 'success' : 'info',
+                      );
+                    })
+                  }
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-xs text-[var(--text-primary)]"
+                >
+                  <Database className="h-3.5 w-3.5" /> Backup SQLite Sekarang
+                </button>
+              </div>
             }
           >
             <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AudioLines, Mic, Play, RefreshCw, Sparkles, Upload, Volume2 } from 'lucide-react';
+import { AudioLines, Mic, Play, RefreshCw, Sparkles, Trash2, Upload, Volume2 } from 'lucide-react';
 import type {
+  VoiceCloneJobRecord,
   VoiceEmotion,
   VoiceProfile,
+  VoiceSampleRecord,
   VoiceServiceStatus,
   VoiceSettings,
   VoiceSpeakingStyle,
@@ -13,6 +15,7 @@ import { ErrorState } from '../components/ui/FeedbackComponents.js';
 import { Panel } from '../components/ui/Panel.js';
 import { StatCard } from '../components/ui/StatCard.js';
 import { StatusBadge } from '../components/ui/StatusBadge.js';
+import { useAppState } from '../context/AppStateContext.js';
 import { backendService } from '../services/backendService.js';
 import { GUIDE_URLS, parseFriendlyError } from '../utils/guideHelper.js';
 
@@ -58,54 +61,46 @@ interface VoiceStudioPageProps {
 }
 
 export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.Element {
+  const { voiceState, setVoiceState } = useAppState();
   const [status, setStatus] = useState<VoiceServiceStatus | null>(null);
   const [settings, setSettings] = useState<VoiceSettings | null>(null);
   const [profiles, setProfiles] = useState<VoiceProfile[]>([]);
+  const [samples, setSamples] = useState<VoiceSampleRecord[]>([]);
+  const [cloneJobs, setCloneJobs] = useState<VoiceCloneJobRecord[]>([]);
   const [history, setHistory] = useState<VoiceSpeechResult[]>([]);
-  const [sampleText, setSampleText] = useState(
-    'Halo semuanya! Selamat datang di siaran langsung Overthinker Ngegame!',
-  );
-  const [emotion, setEmotion] = useState<VoiceEmotion>('excited');
   const [selectedPresetId, setSelectedPresetId] = useState<string>(BUILTIN_CLONE_SAMPLES[0]!.id);
-  const [customSample, setCustomSample] = useState<{
-    name: string;
-    sizeKb: number;
-    url: string;
-    audioBase64: string;
-  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadVoice = useCallback(async () => {
     setError(null);
     try {
-      const [st, cfg, profs, hist] = await Promise.all([
+      const [st, cfg, profs, savedSamples, jobs, hist] = await Promise.all([
         backendService.getVoiceStatus(),
         backendService.getVoiceSettings(),
         backendService.listVoiceProfiles(),
+        backendService.listVoiceSamples(),
+        backendService.listVoiceCloneJobs(25),
         backendService.getVoiceHistory(12),
       ]);
       setStatus(st);
       setSettings(cfg);
       setProfiles(profs);
+      setSamples(savedSamples);
+      setCloneJobs(jobs);
       setHistory(hist);
+      if (!voiceState.selectedSampleId && savedSamples.length > 0) {
+        setVoiceState((prev) => ({ ...prev, selectedSampleId: savedSamples[0]!.id }));
+      }
     } catch (err) {
       const friendly = parseFriendlyError(err, 'Gagal memuat status Studio Suara.');
       setError(friendly.message);
     }
-  }, []);
+  }, [setVoiceState, voiceState.selectedSampleId]);
 
   useEffect(() => {
     void loadVoice();
   }, [loadVoice]);
-
-  useEffect(() => {
-    return () => {
-      if (customSample?.url) {
-        URL.revokeObjectURL(customSample.url);
-      }
-    };
-  }, [customSample]);
 
   const handleUpdateSettings = async (partial: Partial<VoiceSettings>): Promise<void> => {
     setError(null);
@@ -124,22 +119,20 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
     setError(null);
     try {
       const res = await backendService.speakVoiceText({
-        text: textOverride ?? sampleText,
-        emotion: emotionOverride ?? emotion,
+        text: textOverride ?? voiceState.text,
+        emotion: emotionOverride ?? voiceState.emotion,
+        profileId: settings?.activeProfileId,
+        sourceSampleId: voiceState.selectedSampleId ?? undefined,
         playAudio: true,
-        ...(customSample?.audioBase64
-          ? {
-              referenceAudioBase64: customSample.audioBase64,
-              referenceFileName: customSample.name,
-            }
-          : {}),
       });
-      if (res.audioBase64) {
-        const audio = new Audio(res.audioBase64);
+      setVoiceState((prev) => ({ ...prev, lastResult: res }));
+      const playbackUrl = backendService.resolveAssetUrl(res.audioUrl) ?? res.audioBase64;
+      if (playbackUrl) {
+        const audio = new Audio(playbackUrl);
         audio.volume = (settings?.volume ?? 85) / 100;
         void audio.play();
       }
-      onNotify?.(`Sampel suara dijalankan (${res.engineUsed}).`, 'success');
+      onNotify?.(`Sampel suara disimpan & dijalankan (${res.engineUsed}).`, 'success');
       await loadVoice();
     } catch (err) {
       const friendly = parseFriendlyError(err, 'Gagal menjalankan sintesis suara.');
@@ -158,7 +151,7 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
         eventType: 'HIGH_MOTION',
         gameTitle: 'Stardew Valley',
         details: 'Karakter memasuki area baru dengan aktivitas tinggi',
-        emotion,
+        emotion: voiceState.emotion,
         autoSpeak: false,
       });
       onNotify?.('Komentar gameplay berhasil dibuat.', 'success');
@@ -174,23 +167,42 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
 
   const handleUploadSample = (file: File | undefined): void => {
     if (!file) return;
-    if (customSample?.url) {
-      URL.revokeObjectURL(customSample.url);
-    }
-    const url = URL.createObjectURL(file);
     const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] ?? '' : dataUrl;
-      setCustomSample({
-        name: file.name,
-        sizeKb: Math.max(1, Math.round(file.size / 1024)),
-        url,
-        audioBase64: base64,
-      });
-      onNotify?.(`Sampel cloning "${file.name}" siap dikirim ke VoxCPM 2.0.`, 'success');
+    reader.onload = async () => {
+      try {
+        const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+        if (!dataUrl) return;
+        const saved = await backendService.uploadVoiceSample({
+          name: file.name.replace(/\.[^.]+$/, ''),
+          fileName: file.name,
+          mimeType: file.type || 'audio/wav',
+          language: 'id-ID',
+          voiceProfileId: settings?.activeProfileId ?? null,
+          audioBase64: dataUrl,
+        });
+        setVoiceState((prev) => ({ ...prev, selectedSampleId: saved.id }));
+        onNotify?.(`Sampel "${saved.name}" tersimpan permanen di userData.`, 'success');
+        await loadVoice();
+      } catch (err) {
+        const friendly = parseFriendlyError(err, 'Gagal menyimpan sampel suara.');
+        setError(friendly.message);
+        onNotify?.(friendly.message, 'error');
+      }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleDeleteSample = async (id: string): Promise<void> => {
+    await backendService.deleteVoiceSample(id);
+    if (voiceState.selectedSampleId === id) {
+      setVoiceState((prev) => ({ ...prev, selectedSampleId: null }));
+    }
+    await loadVoice();
+  };
+
+  const handleDeleteCloneJob = async (id: string): Promise<void> => {
+    await backendService.deleteVoiceCloneJob(id);
+    await loadVoice();
   };
 
   return (
@@ -200,7 +212,7 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
           Studio Suara AI (VoxCPM 2.0)
         </h2>
         <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-          Atur profil narator Bahasa Indonesia, sampel cloning suara, gaya bicara, kecepatan, dan uji komentar.
+          Seluruh sampel referensi dan hasil voice cloning disimpan permanen di folder userData &amp; SQLite agar tetap dapat diputar setelah restart.
         </p>
       </div>
 
@@ -218,20 +230,20 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
           }
         />
         <StatCard
-          label="Isolasi Layanan"
-          value="Non-Blocking"
-          meta="Gangguan TTS tidak menghentikan kontrol game"
-          badge={<StatusBadge variant="healthy" label="Terlindungi" />}
+          label="Sampel Tersimpan"
+          value={String(samples.length)}
+          meta="Disimpan permanen di userData/voice/samples"
+          badge={<StatusBadge variant="healthy" label="Persisten" />}
+        />
+        <StatCard
+          label="Hasil Voice Cloning"
+          value={String(cloneJobs.length)}
+          meta="File .wav tersimpan di userData/voice/outputs"
         />
         <StatCard
           label="Gaya &amp; Jeda"
           value={`${settings?.style ?? 'santai'} • ${settings?.minCooldownSeconds ?? 8} dtk`}
-          meta="Pembatasan jeda otomatis antar komentar"
-        />
-        <StatCard
-          label="Whisper STT"
-          value={status?.whisperAvailable ? 'Siap' : 'Opsional (Nonaktif)'}
-          meta="Pengenalan suara tambahan"
+          meta="Pengaturan tersimpan di SQLite"
         />
       </section>
 
@@ -244,13 +256,12 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
         />
       )}
 
-      {/* Sampel Cloning Suara */}
       <Panel
-        title="Sampel Cloning Suara (Siap Uji)"
-        subtitle="Pilih preset suara bawaan atau unggah berkas audio referensi (.wav, .mp3, .ogg) untuk pratinjau cloning VoxCPM 2.0."
+        title="Sampel Cloning Suara (Persisten)"
+        subtitle="Pilih preset suara bawaan atau unggah berkas audio referensi (.wav, .mp3, .ogg) untuk disimpan permanen di userData."
       >
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <div className="space-y-2 lg:col-span-7">
+          <div className="space-y-2 lg:col-span-6">
             {BUILTIN_CLONE_SAMPLES.map((preset) => {
               const active = selectedPresetId === preset.id;
               return (
@@ -266,8 +277,11 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
                     type="button"
                     onClick={() => {
                       setSelectedPresetId(preset.id);
-                      setSampleText(preset.sampleLine);
-                      setEmotion(preset.emotion);
+                      setVoiceState((prev) => ({
+                        ...prev,
+                        text: preset.sampleLine,
+                        emotion: preset.emotion,
+                      }));
                       void handleUpdateSettings({ style: preset.style });
                     }}
                     className="min-w-0 flex-1 text-left"
@@ -298,18 +312,19 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
             })}
           </div>
 
-          <div className="flex flex-col justify-between rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 text-xs lg:col-span-5">
-            <div>
-              <div className="font-semibold text-[var(--text-primary)]">
-                Unggah Sampel Suara Referensi
+          <div className="flex flex-col justify-between rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4 text-xs lg:col-span-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="font-semibold text-[var(--text-primary)]">
+                  Pustaka Sampel Suara Referensi
+                </div>
+                <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
+                  Unggah audio 5–15 detik; otomatis disimpan ke disk dan tersedia setelah restart.
+                </p>
               </div>
-              <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
-                Durasi ideal 5–15 detik suara jernih tanpa musik latar untuk referensi cloning VoxCPM 2.0.
-              </p>
-
-              <label className="mt-3 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--accent-primary)]/45 bg-[var(--accent-primary-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:opacity-90">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--accent-primary)]/45 bg-[var(--accent-primary-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:opacity-90">
                 <Upload className="h-3.5 w-3.5" />
-                <span>Pilih File Audio (.wav / .mp3)</span>
+                <span>Unggah Audio</span>
                 <input
                   type="file"
                   accept="audio/*"
@@ -319,21 +334,50 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
               </label>
             </div>
 
-            {customSample ? (
-              <div className="mt-3 space-y-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-main)] p-3">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="truncate font-semibold text-[var(--text-primary)]">
-                    {customSample.name}
-                  </span>
-                  <span className="text-[var(--text-muted)]">{customSample.sizeKb} KB</span>
+            <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
+              {samples.length === 0 ? (
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-main)] px-3 py-2 text-[11px] text-[var(--text-muted)]">
+                  Belum ada file sampel tersimpan di userData.
                 </div>
-                <audio controls src={customSample.url} className="h-8 w-full" />
-              </div>
-            ) : (
-              <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-main)] px-3 py-2 text-[11px] text-[var(--text-muted)]">
-                Belum ada file sampel lokal dipilih. Anda dapat memutar 3 preset bawaan di samping.
-              </div>
-            )}
+              ) : (
+                samples.map((smp) => {
+                  const selected = voiceState.selectedSampleId === smp.id;
+                  const audioSrc = backendService.resolveAssetUrl(smp.audioUrl) ?? '';
+                  return (
+                    <div
+                      key={smp.id}
+                      className={`space-y-1.5 rounded-lg border p-2.5 ${
+                        selected
+                          ? 'border-[var(--accent-primary)] bg-[var(--accent-primary-soft)]'
+                          : 'border-[var(--border-subtle)] bg-[var(--bg-main)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setVoiceState((prev) => ({ ...prev, selectedSampleId: smp.id }))
+                          }
+                          className="truncate text-left font-semibold text-[var(--text-primary)]"
+                        >
+                          {selected ? '● ' : ''}
+                          {smp.name} ({smp.language})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteSample(smp.id)}
+                          aria-label={`Hapus sampel ${smp.name}`}
+                          className="text-[var(--text-muted)] hover:text-rose-400"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {audioSrc && <audio controls src={audioSrc} className="h-8 w-full" />}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       </Panel>
@@ -463,13 +507,15 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
         <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-[var(--border-subtle)] pt-4">
           <input
             type="text"
-            value={sampleText}
-            onChange={(e) => setSampleText(e.target.value)}
+            value={voiceState.text}
+            onChange={(e) => setVoiceState((prev) => ({ ...prev, text: e.target.value }))}
             className="studio-input h-9 min-w-64 flex-1 rounded-lg px-3 text-xs"
           />
           <AppSelect
-            value={emotion}
-            onChange={(val) => setEmotion(val as VoiceEmotion)}
+            value={voiceState.emotion}
+            onChange={(val) =>
+              setVoiceState((prev) => ({ ...prev, emotion: val as VoiceEmotion }))
+            }
             options={[
               { value: 'neutral', label: 'Netral' },
               { value: 'excited', label: 'Antusias' },
@@ -485,7 +531,7 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
             onClick={() => void handleSpeak()}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--accent-primary)]/45 bg-[var(--accent-primary-soft)] px-3 text-xs font-semibold text-[var(--text-primary)] hover:opacity-90 disabled:opacity-50"
           >
-            <Play className="h-3.5 w-3.5" /> Uji Suara ID
+            <Play className="h-3.5 w-3.5" /> Uji &amp; Simpan Suara
           </button>
           <button
             type="button"
@@ -495,6 +541,60 @@ export function VoiceStudioPage({ onNotify }: VoiceStudioPageProps): React.JSX.E
           >
             <Sparkles className="h-3.5 w-3.5" /> Uji Komentar Event
           </button>
+        </div>
+      </Panel>
+
+      <Panel
+        title="Hasil Voice Cloning Tersimpan (Playable)"
+        subtitle="Output audio yang disimpan fisik di userData sehingga tetap dapat diputar setelah restart."
+      >
+        <div className="space-y-2">
+          {cloneJobs.length === 0 ? (
+            <div className="rounded-lg bg-[var(--bg-secondary)] p-3 text-xs text-[var(--text-secondary)]">
+              Belum ada hasil voice cloning tersimpan.
+            </div>
+          ) : (
+            cloneJobs.map((job) => {
+              const audioSrc = backendService.resolveAssetUrl(job.audioUrl);
+              return (
+                <div
+                  key={job.id}
+                  className="flex flex-col gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-3 text-xs"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <span className="font-semibold text-[var(--text-primary)]">
+                        [{job.modelProvider}/{job.emotion}]
+                      </span>{' '}
+                      <span className="text-[var(--text-secondary)]">&quot;{job.text}&quot;</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StatusBadge
+                        variant={job.status === 'completed' ? 'healthy' : 'warning'}
+                        label={job.status}
+                      />
+                      <span className="text-[11px] text-[var(--text-muted)]">
+                        {new Date(job.createdAt).toLocaleString('id-ID')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteCloneJob(job.id)}
+                        aria-label="Hapus hasil clone"
+                        className="text-[var(--text-muted)] hover:text-rose-400"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  {audioSrc ? (
+                    <audio controls src={audioSrc} className="h-8 w-full" />
+                  ) : job.errorMessage ? (
+                    <div className="text-[11px] text-amber-400">{job.errorMessage}</div>
+                  ) : null}
+                </div>
+              );
+            })
+          )}
         </div>
       </Panel>
 

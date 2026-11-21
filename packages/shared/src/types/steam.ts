@@ -15,11 +15,17 @@ export interface SteamGameRecord {
   installPath: string;
   executablePath: string | null;
   sizeOnDiskBytes: number;
+  platform?: string;
+  installed?: boolean;
+  detectionSource?: string;
+  artworkAssetId?: string | null;
+  artworkUrl?: string | null;
   compatibility: SteamGameCompatibility;
   compatibilityReason: string;
   isRunning: boolean;
   pid: number | null;
   lastScannedAt: string;
+  lastSeenAt?: string;
   lastLaunchedAt: string | null;
 }
 
