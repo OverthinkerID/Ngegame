@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Info, Play, RefreshCw, Search, Square, X } from 'lucide-react';
+import { FolderPlus, Info, Play, RefreshCw, Search, Square, Trash2, X } from 'lucide-react';
 import type {
   SteamGameCompatibility,
   SteamGameRecord,
   SteamInstallationStatus,
+  SteamScannerDiagnostics,
 } from '@ngegame/shared';
 import { AppSelect, type SelectOption } from '../components/ui/AppSelect.js';
 import { SteamLogo } from '../components/ui/BrandIcons.js';
@@ -50,6 +51,9 @@ export function GameLibraryPage({
 }: GameLibraryPageProps): React.JSX.Element {
   const [status, setStatus] = useState<SteamInstallationStatus | null>(null);
   const [games, setGames] = useState<SteamGameRecord[]>([]);
+  const [manualPaths, setManualPaths] = useState<string[]>([]);
+  const [manualInput, setManualInput] = useState('');
+  const [scannerDiag, setScannerDiag] = useState<SteamScannerDiagnostics | null>(null);
   const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
   const [query, setQuery] = useState('');
   const [compatFilter, setCompatFilter] = useState<'all' | SteamGameCompatibility>('all');
@@ -61,12 +65,16 @@ export function GameLibraryPage({
     setLoading(true);
     setError(null);
     try {
-      const [steamStatus, savedGames] = await Promise.all([
+      const [steamStatus, savedGames, manuals, diag] = await Promise.all([
         backendService.getSteamStatus(),
         backendService.listSteamGames(),
+        backendService.getManualSteamLibraries().catch(() => []),
+        backendService.getSteamDiagnostics().catch(() => null),
       ]);
       setStatus(steamStatus);
       setGames(savedGames);
+      setManualPaths(manuals);
+      setScannerDiag(diag);
       onGamesUpdated?.(savedGames);
     } catch (err) {
       const friendly = parseFriendlyError(err, 'Gagal memuat data Steam.');
@@ -184,6 +192,79 @@ export function GameLibraryPage({
           onRetry={() => void loadSteamData()}
         />
       )}
+
+      <Panel
+        title="Lokasi Pustaka Manual &amp; Diagnostik Scanner"
+        subtitle="Tambahkan direktori SteamLibrary eksternal/kustom jika berada di drive terpisah."
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            value={manualInput}
+            onChange={(e) => setManualInput(e.target.value)}
+            placeholder="Contoh: D:\SteamLibrary atau /Volumes/Games/Steam"
+            className="studio-input h-9 min-w-[260px] flex-1 rounded-lg px-3 font-mono text-xs placeholder:text-[var(--text-muted)]"
+          />
+          <button
+            type="button"
+            disabled={!manualInput.trim() || loading}
+            onClick={() => {
+              void backendService
+                .addManualSteamLibrary(manualInput.trim())
+                .then((paths) => {
+                  setManualPaths(paths);
+                  setManualInput('');
+                  onNotify?.('Lokasi pustaka manual ditambahkan. Klik Pindai Pustaka untuk memuat game.', 'success');
+                })
+                .catch((err) => {
+                  const friendly = parseFriendlyError(err, 'Gagal menambahkan lokasi pustaka.');
+                  onNotify?.(friendly.message, 'error');
+                });
+            }}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-40"
+          >
+            <FolderPlus className="h-3.5 w-3.5" />
+            Tambah Lokasi
+          </button>
+        </div>
+
+        {manualPaths.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {manualPaths.map((p) => (
+              <span
+                key={p}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 py-1 font-mono text-[11px] text-[var(--text-primary)]"
+              >
+                {p}
+                <button
+                  type="button"
+                  aria-label={`Hapus ${p}`}
+                  onClick={() => {
+                    void backendService.removeManualSteamLibrary(p).then((paths) => {
+                      setManualPaths(paths);
+                      onNotify?.('Lokasi pustaka manual dihapus.', 'info');
+                    });
+                  }}
+                  className="text-[var(--text-muted)] hover:text-rose-400"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {scannerDiag && (
+          <div className="mt-3 flex flex-wrap gap-4 text-[11px] text-[var(--text-secondary)]">
+            <span>Scanner: <strong>{scannerDiag.scannerName}</strong></span>
+            <span>Manifest terbaca: <strong>{scannerDiag.manifestsParsed}</strong></span>
+            <span>Manifest stale: <strong>{scannerDiag.staleManifests.length}</strong></span>
+            {scannerDiag.permissionWarnings.length > 0 && (
+              <span className="text-amber-400">{scannerDiag.permissionWarnings[0]}</span>
+            )}
+          </div>
+        )}
+      </Panel>
 
       <Panel
         title="Daftar Game Lokal"

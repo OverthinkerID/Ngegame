@@ -154,16 +154,62 @@ model VoiceSpeechLog {
 }
 
 model StreamSessionLog {
-  id            Int       @id @default(autoincrement())
-  platforms     String
-  visibility    String    @default("unlisted")
-  avgBitrate    Int       @default(0)
-  droppedFrames Int       @default(0)
-  status        String
-  startedAt     DateTime  @default(now())
-  endedAt       DateTime?
+  id              Int       @id @default(autoincrement())
+  platforms       String
+  visibility      String    @default("unlisted")
+  title           String    @default("Sesi Siaran Overthinker")
+  avgBitrate      Int       @default(0)
+  peakBitrate     Int       @default(0)
+  avgFps          Float     @default(0)
+  droppedFrames   Int       @default(0)
+  durationSeconds Int       @default(0)
+  chatCount       Int       @default(0)
+  narrationCount  Int       @default(0)
+  peakViewers     Int       @default(0)
+  status          String
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
 
   @@index([startedAt])
+}
+
+model StreamAnalyticsSample {
+  id            Int      @id @default(autoincrement())
+  sessionId     Int?
+  bitrateKbps   Int      @default(0)
+  fps           Float    @default(0)
+  droppedFrames Int      @default(0)
+  audioLevelDb  Float    @default(-60)
+  viewers       Int      @default(0)
+  chatCount     Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([sessionId, createdAt])
+  @@index([createdAt])
+}
+
+model StreamChatLog {
+  id        Int      @id @default(autoincrement())
+  platform  String
+  author    String
+  message   String
+  isCommand Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([platform, createdAt])
+}
+
+model StreamAssistantLog {
+  id             Int      @id @default(autoincrement())
+  suggestionType String
+  title          String
+  message        String
+  suggestedScene String?
+  confidence     Float    @default(0.5)
+  status         String   @default("pending")
+  createdAt      DateTime @default(now())
+
+  @@index([status, createdAt])
 }
 
 model ResourceSnapshot {
@@ -176,4 +222,61 @@ model ResourceSnapshot {
   createdAt        DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model GameProfileRecord {
+  id              Int      @id @default(autoincrement())
+  gameId          String   @unique
+  gameName        String
+  platform        String
+  genre           String
+  adapterType     String
+  profileVersion  Int      @default(1)
+  isBuiltin       Boolean  @default(false)
+  profileJson     String
+  calibrationJson String   @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([genre])
+}
+
+model GameMemoryEntry {
+  id         Int      @id @default(autoincrement())
+  gameId     String
+  memoryType String
+  key        String
+  valueJson  String
+  confidence Float    @default(0.5)
+  createdAt  DateTime @default(now())
+
+  @@index([gameId, memoryType, createdAt])
+}
+
+model GameProfileVersion {
+  id             Int      @id @default(autoincrement())
+  gameId         String
+  profileVersion Int
+  changeSummary  String
+  author         String   @default("human")
+  profileJson    String
+  createdAt      DateTime @default(now())
+
+  @@index([gameId, profileVersion])
+}
+
+model AdaptationProposal {
+  id              Int       @id @default(autoincrement())
+  gameId          String
+  title           String
+  rationale       String
+  proposedChanges String
+  confidence      Float     @default(0.5)
+  status          String    @default("pending")
+  reviewedBy      String?
+  reviewNote      String?
+  createdAt       DateTime  @default(now())
+  reviewedAt      DateTime?
+
+  @@index([gameId, status, createdAt])
 }

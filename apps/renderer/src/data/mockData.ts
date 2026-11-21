@@ -12,6 +12,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'ai-control', label: 'Kendali AI', description: 'Konfigurasi penalaran AI, izin L1–L3, dan antrean aksi' },
   { id: 'vision', label: 'Monitor Visi', description: 'Pengambilan layar, deteksi jendela aktif, dan pembacaan OCR' },
   { id: 'adapters', label: 'Adaptor Game', description: 'Registri profil genre dan aturan aksi per game' },
+  { id: 'adaptation-studio', label: 'Adaptation Studio', description: 'Profil game, kalibrasi 11 langkah, AI Game Brain, & diagnostik 12-tahap' },
   { id: 'streaming', label: 'Studio Siaran', description: 'Koneksi OBS WebSocket v5 dan multistream YouTube / Twitch' },
   { id: 'voice', label: 'Studio Suara AI', description: 'Sintesis suara komentar Bahasa Indonesia via VoxCPM 2.0' },
   { id: 'analytics', label: 'Analitik', description: 'Statistik performa AI, siaran, dan ekspor laporan' },

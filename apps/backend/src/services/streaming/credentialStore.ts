@@ -13,16 +13,33 @@ export function maskSecret(secret: string): string {
   return `${'*'.repeat(Math.min(trimmed.length - 4, 12))}${trimmed.slice(-4)}`;
 }
 
+export function redactSensitiveText(input: string): string {
+  return input
+    .replace(/live_[a-zA-Z0-9_-]{8,}/g, 'live_***REDACTED***')
+    .replace(/ya29\.[a-zA-Z0-9._-]{12,}/g, 'ya29.***REDACTED***')
+    .replace(/oauth:[a-zA-Z0-9_-]{8,}/g, 'oauth:***REDACTED***')
+    .replace(/(Bearer\s+)[a-zA-Z0-9._-]{8,}/gi, '$1***REDACTED***')
+    .replace(/(streamKey|client_secret|access_token|refresh_token|password)["']?\s*[:=]\s*["']?[^\s,"'}]+/gi, '$1=***REDACTED***');
+}
+
 /**
- * Stores stream credentials in OS Credential Manager:
+ * Stores stream credentials & OAuth tokens in OS Credential Manager:
  * - Windows: cmdkey (Windows Credential Manager)
  * - macOS: security add-generic-password (macOS Keychain)
  * Falls back to AES-256-GCM encrypted memory vault if OS keychain is unavailable in headless tests.
- * Never persists plaintext keys to SQLite or logs.
+ * Never persists plaintext keys, passwords, or tokens to SQLite or logs.
  */
 export class StreamCredentialStore {
   private readonly sessionKey = crypto.randomBytes(32);
   private readonly memoryVault = new Map<string, { iv: string; tag: string; data: string }>();
+  private lastBackend: 'os-credential-manager' | 'memory-encrypted' =
+    process.platform === 'darwin' || process.platform === 'win32'
+      ? 'os-credential-manager'
+      : 'memory-encrypted';
+
+  public getVaultBackend(): 'os-credential-manager' | 'memory-encrypted' {
+    return this.lastBackend;
+  }
 
   private encryptInMemory(account: string, secret: string): void {
     const iv = crypto.randomBytes(12);
@@ -52,7 +69,10 @@ export class StreamCredentialStore {
     return decrypted.toString('utf8');
   }
 
-  public async saveSecret(account: string, secret: string): Promise<'os-credential-manager' | 'memory-encrypted'> {
+  public async saveSecret(
+    account: string,
+    secret: string,
+  ): Promise<'os-credential-manager' | 'memory-encrypted'> {
     const trimmed = secret.trim();
     this.encryptInMemory(account, trimmed);
 
@@ -68,6 +88,7 @@ export class StreamCredentialStore {
           trimmed,
           '-U',
         ]);
+        this.lastBackend = 'os-credential-manager';
         return 'os-credential-manager';
       }
 
@@ -77,16 +98,21 @@ export class StreamCredentialStore {
           `/user:${account}`,
           `/pass:${trimmed}`,
         ]);
+        this.lastBackend = 'os-credential-manager';
         return 'os-credential-manager';
       }
     } catch {
       // Fallback to encrypted memory vault when OS keychain is locked or unavailable
     }
 
+    this.lastBackend = 'memory-encrypted';
     return 'memory-encrypted';
   }
 
   public async getSecret(account: string): Promise<string | null> {
+    const mem = this.decryptInMemory(account);
+    if (mem) return mem;
+
     try {
       if (process.platform === 'darwin') {
         const { stdout } = await execFileAsync('security', [
@@ -98,13 +124,21 @@ export class StreamCredentialStore {
           '-w',
         ]);
         const found = stdout.trim();
-        if (found) return found;
+        if (found) {
+          this.encryptInMemory(account, found);
+          return found;
+        }
       }
     } catch {
       // fallback to memory vault
     }
 
-    return this.decryptInMemory(account);
+    return null;
+  }
+
+  public async hasSecret(account: string): Promise<boolean> {
+    const val = await this.getSecret(account);
+    return Boolean(val && val.length > 0);
   }
 
   public async deleteSecret(account: string): Promise<void> {

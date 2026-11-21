@@ -14,6 +14,54 @@ export function createSteamRouter(steamManager = new SteamManager()): Router {
     }
   });
 
+  router.get('/diagnostics', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      let diagnostics = steamManager.getDiagnostics();
+      if (!diagnostics) {
+        await steamManager.detectInstallation();
+        diagnostics = steamManager.getDiagnostics();
+      }
+      res.json({ ok: true, diagnostics });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/libraries/manual', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const paths = await steamManager.getManualLibraryPaths();
+      res.json({ ok: true, paths });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/libraries/manual', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { libraryPath } = req.body as { libraryPath?: string };
+      if (!libraryPath || typeof libraryPath !== 'string') {
+        throw new AppError('libraryPath wajib diisi.', ErrorCode.VALIDATION_ERROR, 400);
+      }
+      const paths = await steamManager.addManualLibraryPath(libraryPath);
+      res.status(201).json({ ok: true, paths });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.delete('/libraries/manual', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { libraryPath } = req.body as { libraryPath?: string };
+      if (!libraryPath || typeof libraryPath !== 'string') {
+        throw new AppError('libraryPath wajib diisi.', ErrorCode.VALIDATION_ERROR, 400);
+      }
+      const paths = await steamManager.removeManualLibraryPath(libraryPath);
+      res.json({ ok: true, paths });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.get('/games', async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const games = await steamManager.listGames();
