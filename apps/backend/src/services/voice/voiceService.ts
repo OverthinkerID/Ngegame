@@ -167,7 +167,7 @@ export class VoiceStudioService {
     const res = await fetch(`${this.settings.voxcpmBaseUrl}/api/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(300000),
       body: JSON.stringify({
         text,
         language: 'id',
@@ -180,7 +180,14 @@ export class VoiceStudioService {
     });
 
     if (!res.ok) {
-      throw new Error(`VoxCPM 2.0 HTTP ${res.status}`);
+      let detail = `VoxCPM 2.0 HTTP ${res.status}`;
+      try {
+        const errJson = (await res.json()) as { error?: string };
+        if (errJson?.error) detail = `${detail}: ${errJson.error}`;
+      } catch {
+        // ignore non-json error body
+      }
+      throw new Error(detail);
     }
 
     const contentType = res.headers.get('content-type') ?? '';

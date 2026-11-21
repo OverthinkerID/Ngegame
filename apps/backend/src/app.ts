@@ -82,7 +82,7 @@ export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
       },
     }),
   );
-  app.use(express.json({ limit: '2mb' }));
+  app.use(express.json({ limit: '15mb' }));
 
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: '/ws' });

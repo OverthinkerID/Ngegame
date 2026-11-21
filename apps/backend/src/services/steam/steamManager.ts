@@ -263,6 +263,20 @@ export class SteamManager {
             return path.join(installPath, preferred.name);
           }
         }
+        // Beberapa game Steam macOS (seperti Stardew Valley) menaruh Contents/MacOS langsung di installPath
+        const macosBinDir = path.join(installPath, 'Contents', 'MacOS');
+        if (await pathExists(macosBinDir)) {
+          const macBins = await fs.readdir(macosBinDir, { withFileTypes: true });
+          const execCandidate =
+            macBins.find(
+              (b) =>
+                b.isFile() &&
+                b.name.toLowerCase().replace(/[^a-z0-9]/g, '').includes(normalizedGameName),
+            ) ?? macBins.find((b) => b.isFile());
+          if (execCandidate) {
+            return path.join(macosBinDir, execCandidate.name);
+          }
+        }
       }
 
       if (process.platform === 'win32') {
