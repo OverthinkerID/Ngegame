@@ -321,4 +321,19 @@ model CommentaryHistory {
   @@index([status, createdAt])
 }
 
+model VoiceProfile {
+  id             String   @id
+  name           String
+  engine         String   @default("voxcpm2")
+  language       String   @default("id")
+  speed          Float    @default(1.0)
+  pitch          Float    @default(1.0)
+  emotion        String   @default("neutral")
+  expressiveness Float    @default(0.7)
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+
 

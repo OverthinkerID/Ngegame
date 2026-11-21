@@ -101,3 +101,50 @@ export interface CommentaryStatusResponse {
   queue: CommentaryItem[];
   history: CommentaryItem[];
 }
+
+export interface StreamVoiceProfile {
+  id: string;
+  name: string;
+  engine: 'voxcpm2' | 'os-local' | 'cloud-tts';
+  language: CommentaryLanguage;
+  speed: number;
+  pitch: number;
+  emotion: 'neutral' | 'excited' | 'tense' | 'humorous' | 'calm';
+  expressiveness: number;
+  isDefault: boolean;
+}
+
+export interface VoicePersonalityConfig {
+  activeProfileId: string;
+  language: CommentaryLanguage;
+  speed: number;
+  pitch: number;
+  emotion: 'neutral' | 'excited' | 'tense' | 'humorous' | 'calm';
+  expressiveness: number;
+  preferLocalTts: boolean;
+  routeToObs: boolean;
+  obsAudioInputName: string;
+}
+
+export interface VoiceQueueEntry {
+  id: string;
+  text: string;
+  profileId: string;
+  language: CommentaryLanguage;
+  emotion: 'neutral' | 'excited' | 'tense' | 'humorous' | 'calm';
+  priority: number;
+  status: 'queued' | 'speaking' | 'completed' | 'interrupted' | 'failed';
+  engineUsed: string | null;
+  createdAt: string;
+}
+
+export interface VoicePersonalityStatusResponse {
+  speaking: boolean;
+  interrupted: boolean;
+  config: VoicePersonalityConfig;
+  profiles: StreamVoiceProfile[];
+  queue: VoiceQueueEntry[];
+  history: VoiceQueueEntry[];
+  lastError: string | null;
+}
+

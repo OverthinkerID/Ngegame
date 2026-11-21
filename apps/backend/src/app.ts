@@ -28,6 +28,7 @@ import { RuntimeOrchestratorService } from './services/runtime/runtimeOrchestrat
 import { SteamManager } from './services/steam/steamManager.js';
 import { GameplayEventIntelligenceService } from './services/streamIntelligence/gameplayEventIntelligenceService.js';
 import { LiveCommentaryService } from './services/streamIntelligence/liveCommentaryService.js';
+import { VoicePersonalityService } from './services/streamIntelligence/voicePersonalityService.js';
 import { SupervisionService } from './services/supervision/supervisionService.js';
 import { VisionService } from './services/vision/visionService.js';
 import { Logger } from './utils/logger.js';
@@ -165,8 +166,9 @@ export function createBackendApp(config: BackendEnvConfig): BackendAppContext {
   app.use('/api/voice', createVoiceRouter());
   const streamEventService = new GameplayEventIntelligenceService(broadcastWs);
   const liveCommentaryService = new LiveCommentaryService(broadcastWs);
+  const voicePersonalityService = new VoicePersonalityService(broadcastWs);
   app.use('/api/streaming', createStreamingRouter());
-  app.use('/api/stream-intelligence', createStreamIntelligenceRouter(streamEventService, liveCommentaryService));
+  app.use('/api/stream-intelligence', createStreamIntelligenceRouter(streamEventService, liveCommentaryService, voicePersonalityService));
   app.use('/api/analytics', createAnalyticsRouter());
   app.use('/api/system', createSystemRouter());
   app.use(

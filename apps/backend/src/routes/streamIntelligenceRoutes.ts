@@ -7,13 +7,16 @@ import {
   type CommentaryPersonality,
   type GameplayObservationInput,
   type StreamIntelligenceMode,
+  type VoicePersonalityConfig,
 } from '@ngegame/shared';
 import { GameplayEventIntelligenceService } from '../services/streamIntelligence/gameplayEventIntelligenceService.js';
 import { LiveCommentaryService } from '../services/streamIntelligence/liveCommentaryService.js';
+import { VoicePersonalityService } from '../services/streamIntelligence/voicePersonalityService.js';
 
 export function createStreamIntelligenceRouter(
   eventService = new GameplayEventIntelligenceService(),
   commentaryService = new LiveCommentaryService(),
+  voicePersonalityService = new VoicePersonalityService(),
 ): Router {
   const router = Router();
 
@@ -98,9 +101,7 @@ export function createStreamIntelligenceRouter(
       let targetEvent = undefined;
       if (!text) {
         const events = await eventService.listEvents(20);
-        targetEvent = eventId
-          ? events.find((e) => e.id === eventId)
-          : events[0];
+        targetEvent = eventId ? events.find((e) => e.id === eventId) : events[0];
       }
 
       const result = await commentaryService.generateCommentary({
@@ -151,10 +152,74 @@ export function createStreamIntelligenceRouter(
     }
   });
 
+  router.get('/voice', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = await voicePersonalityService.getStatus();
+      res.json({ ok: true, ...status });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/voice/profiles', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const profiles = await voicePersonalityService.listProfiles();
+      res.json({ ok: true, profiles });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/voice/profiles', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const profile = await voicePersonalityService.upsertProfile(req.body ?? {});
+      res.status(201).json({ ok: true, profile });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.put('/voice/config', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const config = await voicePersonalityService.updateConfig(
+        (req.body ?? {}) as Partial<VoicePersonalityConfig>,
+      );
+      res.json({ ok: true, config });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/voice/speak', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = await voicePersonalityService.enqueueSpeech({
+        text: String(req.body?.text ?? ''),
+        priority: req.body?.priority !== undefined ? Number(req.body.priority) : undefined,
+        emotion: req.body?.emotion,
+        language: req.body?.language,
+        playAudio: Boolean(req.body?.playAudio),
+        urgent: Boolean(req.body?.urgent),
+      });
+      res.json({ ok: true, ...status });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/voice/interrupt', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = await voicePersonalityService.interrupt();
+      res.json({ ok: true, ...status });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.post('/emergency-stop', async (_req: Request, res: Response, next: NextFunction) => {
     try {
       await eventService.emergencyStop();
       await commentaryService.stopAndClear(true);
+      await voicePersonalityService.interrupt();
       res.json({ ok: true, status: await eventService.getStatus() });
     } catch (err) {
       next(err);

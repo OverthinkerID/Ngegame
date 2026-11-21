@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { GameplayEventIntelligenceService } from '../src/services/streamIntelligence/gameplayEventIntelligenceService.js';
 import { LiveCommentaryService } from '../src/services/streamIntelligence/liveCommentaryService.js';
 
-describe('Phase 16.2 & 16.3: Gameplay Event Intelligence & AI Live Commentary', () => {
+import { VoicePersonalityService } from '../src/services/streamIntelligence/voicePersonalityService.js';
+
+describe('Phase 16.2–16.4: Event Intelligence, Live Commentary & Voice Personality', () => {
   it('rejects unverified controller-only claims and detects verified Stardew Valley events with WS broadcast', async () => {
     const emitted: Array<{ eventType: string; payload: unknown }> = [];
     const service = new GameplayEventIntelligenceService((eventType, payload) => {
@@ -141,5 +143,48 @@ describe('Phase 16.2 & 16.3: Gameplay Event Intelligence & AI Live Commentary', 
     const stopped = await commentary.stopAndClear(true);
     assert.equal(stopped.queue.length, 0);
     assert.equal(stopped.config.muted, true);
+  });
+
+  it('manages VoiceProfile persistence, speed/pitch/emotion config, priority speech queue, WS broadcast, and interrupt', async () => {
+    const emitted: Array<{ eventType: string; payload: unknown }> = [];
+    const voicePersonality = new VoicePersonalityService((eventType, payload) => {
+      emitted.push({ eventType, payload });
+    });
+
+    const profiles = await voicePersonality.listProfiles();
+    assert.ok(profiles.length >= 4);
+
+    const custom = await voicePersonality.upsertProfile({
+      id: 'custom-stardew-id',
+      name: 'Petani Santai (ID)',
+      engine: 'os-local',
+      language: 'id',
+      speed: 1.1,
+      pitch: 1.05,
+      emotion: 'excited',
+      expressiveness: 0.85,
+    });
+    assert.equal(custom.id, 'custom-stardew-id');
+
+    const cfg = await voicePersonality.updateConfig({
+      activeProfileId: 'custom-stardew-id',
+      preferLocalTts: false,
+      routeToObs: true,
+    });
+    assert.equal(cfg.speed, 1.1);
+    assert.equal(cfg.pitch, 1.05);
+    assert.equal(cfg.emotion, 'excited');
+
+    const spoken = await voicePersonality.enqueueSpeech({
+      text: 'Panen parsnip hari ini sukses besar!',
+      priority: 3,
+      playAudio: false,
+    });
+    assert.ok(emitted.some((e) => e.eventType === 'stream:voice-started'));
+    assert.ok(spoken.history.length >= 1);
+
+    const interrupted = await voicePersonality.interrupt();
+    assert.equal(interrupted.interrupted, true);
+    assert.equal(interrupted.queue.length, 0);
   });
 });
