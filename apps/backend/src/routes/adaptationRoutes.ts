@@ -51,7 +51,20 @@ export function createAdaptationRouter(deps: {
 
   router.get('/profiles/:gameId', async (req, res, next) => {
     try {
-      const profile = await deps.profileManager.getProfile(req.params.gameId);
+      let profile = await deps.profileManager.getProfile(req.params.gameId);
+      if (!profile.executablePath || !profile.installationPath) {
+        const games = await deps.steamManager.listGames().catch(() => []);
+        const matched = games.find((g) =>
+          g.name.toLowerCase().includes(profile.gameName.toLowerCase()),
+        );
+        if (matched && (matched.executablePath || matched.installPath)) {
+          profile = await deps.profileManager.saveProfile({
+            ...profile,
+            executablePath: profile.executablePath ?? matched.executablePath ?? null,
+            installationPath: profile.installationPath ?? matched.installPath,
+          });
+        }
+      }
       const validation = await deps.profileManager.getDiagnostics(req.params.gameId);
       res.json({ profile, validation });
     } catch (err) {
