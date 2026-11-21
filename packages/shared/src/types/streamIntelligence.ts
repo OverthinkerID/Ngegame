@@ -148,3 +148,65 @@ export interface VoicePersonalityStatusResponse {
   lastError: string | null;
 }
 
+export type ChatAutomationMode =
+  | 'observe_only'
+  | 'suggest_reply'
+  | 'approval_required'
+  | 'automatic_reply';
+
+export type ChatMessageCategory =
+  | 'question'
+  | 'command'
+  | 'praise'
+  | 'spam'
+  | 'toxic'
+  | 'general';
+
+export type ChatModerationAction = 'none' | 'warn' | 'timeout' | 'delete';
+
+export interface ChatFaqEntry {
+  keyword: string;
+  answer: string;
+}
+
+export interface ChatIntelligenceConfig {
+  mode: ChatAutomationMode;
+  allowAutoReply: boolean;
+  allowAutoModeration: boolean;
+  blockedWords: string[];
+  faqs: ChatFaqEntry[];
+}
+
+export interface ChatInteractionItem {
+  id: number;
+  platform: 'youtube' | 'twitch';
+  author: string;
+  message: string;
+  category: ChatMessageCategory;
+  isSpam: boolean;
+  isQuestion: boolean;
+  proposedReply: string | null;
+  finalReply: string | null;
+  replyStatus: 'none' | 'proposed' | 'approved' | 'sent' | 'rejected';
+  moderationSuggestion: ChatModerationAction;
+  createdAt: string;
+}
+
+export interface ChatModerationLogItem {
+  id: number;
+  interactionId: number | null;
+  platform: 'youtube' | 'twitch';
+  author: string;
+  action: ChatModerationAction;
+  reason: string;
+  status: 'suggested' | 'approved' | 'executed' | 'rejected';
+  createdAt: string;
+}
+
+export interface ChatIntelligenceStatusResponse {
+  config: ChatIntelligenceConfig;
+  interactions: ChatInteractionItem[];
+  moderationLogs: ChatModerationLogItem[];
+}
+
+

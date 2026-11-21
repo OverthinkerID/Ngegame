@@ -9,6 +9,7 @@ import {
   type StreamIntelligenceMode,
   type VoicePersonalityConfig,
 } from '@ngegame/shared';
+import { ChatIntelligenceService } from '../services/streamIntelligence/chatIntelligenceService.js';
 import { GameplayEventIntelligenceService } from '../services/streamIntelligence/gameplayEventIntelligenceService.js';
 import { LiveCommentaryService } from '../services/streamIntelligence/liveCommentaryService.js';
 import { VoicePersonalityService } from '../services/streamIntelligence/voicePersonalityService.js';
@@ -17,6 +18,7 @@ export function createStreamIntelligenceRouter(
   eventService = new GameplayEventIntelligenceService(),
   commentaryService = new LiveCommentaryService(),
   voicePersonalityService = new VoicePersonalityService(),
+  chatIntelligenceService = new ChatIntelligenceService(),
 ): Router {
   const router = Router();
 
@@ -210,6 +212,77 @@ export function createStreamIntelligenceRouter(
     try {
       const status = await voicePersonalityService.interrupt();
       res.json({ ok: true, ...status });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/chat', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = await chatIntelligenceService.getStatus();
+      res.json({ ok: true, ...status });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/chat/ingest', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const platform = req.body?.platform === 'twitch' ? 'twitch' : 'youtube';
+      const item = await chatIntelligenceService.ingestMessage({
+        platform,
+        author: String(req.body?.author ?? ''),
+        message: String(req.body?.message ?? ''),
+      });
+      res.status(201).json({ ok: true, item });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.put('/chat/config', (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const config = chatIntelligenceService.updateConfig(req.body ?? {});
+      res.json({ ok: true, config });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/chat/approve', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.body?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new AppError('id interaksi chat tidak valid', ErrorCode.VALIDATION_ERROR, 400);
+      }
+      const item = await chatIntelligenceService.approveReply(id, req.body?.editedReply);
+      res.json({ ok: true, item });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/chat/reject', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.body?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new AppError('id interaksi chat tidak valid', ErrorCode.VALIDATION_ERROR, 400);
+      }
+      const item = await chatIntelligenceService.rejectReply(id);
+      res.json({ ok: true, item });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/chat/moderation/:id/approve', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new AppError('id log moderasi tidak valid', ErrorCode.VALIDATION_ERROR, 400);
+      }
+      const log = await chatIntelligenceService.approveModeration(id);
+      res.json({ ok: true, log });
     } catch (err) {
       next(err);
     }

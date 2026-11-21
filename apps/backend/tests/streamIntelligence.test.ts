@@ -1,11 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { ChatIntelligenceService } from '../src/services/streamIntelligence/chatIntelligenceService.js';
 import { GameplayEventIntelligenceService } from '../src/services/streamIntelligence/gameplayEventIntelligenceService.js';
 import { LiveCommentaryService } from '../src/services/streamIntelligence/liveCommentaryService.js';
-
 import { VoicePersonalityService } from '../src/services/streamIntelligence/voicePersonalityService.js';
 
-describe('Phase 16.2–16.4: Event Intelligence, Live Commentary & Voice Personality', () => {
+describe('Phase 16.2–16.5: Stream Intelligence Engine', () => {
   it('rejects unverified controller-only claims and detects verified Stardew Valley events with WS broadcast', async () => {
     const emitted: Array<{ eventType: string; payload: unknown }> = [];
     const service = new GameplayEventIntelligenceService((eventType, payload) => {
@@ -101,21 +101,18 @@ describe('Phase 16.2–16.4: Event Intelligence, Live Commentary & Voice Persona
     assert.ok(first.item?.text.includes('Waduh'));
     assert.ok(emitted.some((e) => e.eventType === 'stream:commentary-generated'));
 
-    // Cooldown blocks immediate non-critical commentary
     const cooled = await commentary.generateCommentary({
       text: 'Komentar terlalu cepat',
       nowMs: t0 + 3000,
     });
     assert.equal(cooled.accepted, false);
 
-    // Duplicate prevention blocks identical text even after cooldown
     const dup = await commentary.generateCommentary({
       text: first.item!.text,
       nowMs: t0 + 15000,
     });
     assert.equal(dup.accepted, false);
 
-    // Different language + cinematic personality + higher priority
     const enCinematic = await commentary.generateCommentary({
       event: ev,
       personality: 'cinematic',
@@ -126,7 +123,6 @@ describe('Phase 16.2–16.4: Event Intelligence, Live Commentary & Voice Persona
     assert.equal(enCinematic.accepted, true);
     assert.ok(enCinematic.item?.text.includes('decisive moment'));
 
-    // Manual edit
     const edited = await commentary.editCommentary(
       enCinematic.item!.id,
       'Momen sinematik yang telah disunting manual.',
@@ -134,12 +130,10 @@ describe('Phase 16.2–16.4: Event Intelligence, Live Commentary & Voice Persona
     assert.equal(edited.status, 'edited');
     assert.equal(edited.editedText, 'Momen sinematik yang telah disunting manual.');
 
-    // Silence detection after threshold
     const silenceStatus = await commentary.getStatus(t0 + 45000);
     assert.equal(silenceStatus.silenceDetected, true);
     assert.ok(silenceStatus.queue[0]!.priority >= 4);
 
-    // Stop & clear queue
     const stopped = await commentary.stopAndClear(true);
     assert.equal(stopped.queue.length, 0);
     assert.equal(stopped.config.muted, true);
@@ -186,5 +180,47 @@ describe('Phase 16.2–16.4: Event Intelligence, Live Commentary & Voice Persona
     const interrupted = await voicePersonality.interrupt();
     assert.equal(interrupted.interrupted, true);
     assert.equal(interrupted.queue.length, 0);
+  });
+
+  it('classifies YouTube/Twitch chat, detects spam & blocked words, proposes & approves replies, and guards auto-moderation', async () => {
+    const emitted: Array<{ eventType: string; payload: unknown }> = [];
+    const chat = new ChatIntelligenceService((eventType, payload) => {
+      emitted.push({ eventType, payload });
+    });
+
+    const q = await chat.ingestMessage({
+      platform: 'youtube',
+      author: 'BudiGamer',
+      message: 'Bang ini game apa ya?',
+    });
+    assert.equal(q.isQuestion, true);
+    assert.equal(q.category, 'question');
+    assert.equal(q.replyStatus, 'proposed');
+    assert.ok(q.proposedReply?.includes('@BudiGamer'));
+    assert.ok(emitted.some((e) => e.eventType === 'stream:chat-received'));
+    assert.ok(emitted.some((e) => e.eventType === 'stream:chat-reply-proposed'));
+
+    const approved = await chat.approveReply(q.id, '@BudiGamer Lagi main Stardew Valley!');
+    assert.equal(approved.replyStatus, 'approved');
+    assert.equal(approved.finalReply, '@BudiGamer Lagi main Stardew Valley!');
+
+    const spam = await chat.ingestMessage({
+      platform: 'twitch',
+      author: 'SpamBot',
+      message: 'Cek link gratis https://spam.example.com sekarang!',
+    });
+    assert.equal(spam.isSpam, true);
+    assert.equal(spam.moderationSuggestion, 'delete');
+
+    const toxic = await chat.ingestMessage({
+      platform: 'youtube',
+      author: 'BadUser',
+      message: 'Awas ada scam di sini',
+    });
+    assert.equal(toxic.category, 'toxic');
+    assert.equal(toxic.moderationSuggestion, 'timeout');
+
+    const st = await chat.getStatus(10);
+    assert.ok(st.moderationLogs.some((l) => l.status === 'suggested'));
   });
 });

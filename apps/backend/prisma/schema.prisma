@@ -335,5 +335,37 @@ model VoiceProfile {
   updatedAt      DateTime @updatedAt
 }
 
+model ChatInteraction {
+  id                   Int      @id @default(autoincrement())
+  platform             String
+  author               String
+  message              String
+  category             String   @default("general")
+  isSpam               Boolean  @default(false)
+  isQuestion           Boolean  @default(false)
+  proposedReply        String?
+  finalReply           String?
+  replyStatus          String   @default("none")
+  moderationSuggestion String   @default("none")
+  createdAt            DateTime @default(now())
+
+  @@index([platform, createdAt])
+  @@index([replyStatus, createdAt])
+}
+
+model ChatModerationLog {
+  id            Int      @id @default(autoincrement())
+  interactionId Int?
+  platform      String
+  author        String
+  action        String
+  reason        String
+  status        String   @default("suggested")
+  createdAt     DateTime @default(now())
+
+  @@index([status, createdAt])
+}
+
+
 
 
