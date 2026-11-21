@@ -6,6 +6,7 @@ export type PageId =
   | 'adapters'
   | 'adaptation-studio'
   | 'streaming'
+  | 'stream-intelligence'
   | 'voice'
   | 'analytics'
   | 'history'
