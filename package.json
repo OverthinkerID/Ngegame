@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "dev": "concurrently -n backend,renderer,desktop -c cyan,magenta,green \"npm run dev -w @ngegame/backend\" \"npm run dev -w @ngegame/renderer\" \"npm run dev -w @ngegame/desktop\"",
+    "dev:all": "concurrently -n backend,renderer,desktop,voice -c cyan,magenta,green,yellow \"npm run dev -w @ngegame/backend\" \"npm run dev -w @ngegame/renderer\" \"npm run dev -w @ngegame/desktop\" \"npm run voice:server\"",
     "dev:backend": "npm run dev -w @ngegame/backend",
     "dev:renderer": "npm run dev -w @ngegame/renderer",
     "dev:desktop": "npm run dev -w @ngegame/desktop",
