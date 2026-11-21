@@ -23,7 +23,8 @@ def handle_capture_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
     sampling_interval_ms = int(payload.get("samplingIntervalMs") or 1000)
 
     png_bytes = capture_screen_png(
-        source_path=str(source_path) if isinstance(source_path, str) and source_path else None
+        source_path=str(source_path) if isinstance(source_path, str) and source_path else None,
+        window_title=window_title,
     )
     return _analyzer.analyze_png(
         png_bytes=png_bytes,

@@ -4,6 +4,7 @@ export type PageId =
   | 'ai-control'
   | 'vision'
   | 'adapters'
+  | 'adaptation-studio'
   | 'streaming'
   | 'voice'
   | 'analytics'

@@ -161,22 +161,33 @@ export class VoiceStudioService {
   private async synthesizeViaVoxCpm(
     text: string,
     emotion: VoiceEmotion,
+    referenceAudioBase64?: string,
+    referenceFileName?: string,
   ): Promise<string | undefined> {
     const res = await fetch(`${this.settings.voxcpmBaseUrl}/api/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(300000),
       body: JSON.stringify({
         text,
         language: 'id',
         speed: this.settings.speed,
         emotion,
         profile_id: this.settings.activeProfileId,
+        ...(referenceAudioBase64 ? { reference_audio_base64: referenceAudioBase64 } : {}),
+        ...(referenceFileName ? { reference_filename: referenceFileName } : {}),
       }),
     });
 
     if (!res.ok) {
-      throw new Error(`VoxCPM 2.0 HTTP ${res.status}`);
+      let detail = `VoxCPM 2.0 HTTP ${res.status}`;
+      try {
+        const errJson = (await res.json()) as { error?: string };
+        if (errJson?.error) detail = `${detail}: ${errJson.error}`;
+      } catch {
+        // ignore non-json error body
+      }
+      throw new Error(detail);
     }
 
     const contentType = res.headers.get('content-type') ?? '';
@@ -227,7 +238,12 @@ export class VoiceStudioService {
     try {
       if (this.settings.activeEngine === 'voxcpm2') {
         try {
-          audioBase64 = await this.synthesizeViaVoxCpm(text, emotion);
+          audioBase64 = await this.synthesizeViaVoxCpm(
+            text,
+            emotion,
+            request.referenceAudioBase64,
+            request.referenceFileName,
+          );
           this.lastError = null;
         } catch (voxErr) {
           const msg = voxErr instanceof Error ? voxErr.message : String(voxErr);

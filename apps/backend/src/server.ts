@@ -5,8 +5,15 @@ import { disconnectDatabase, recordSystemLog } from './db/prisma.js';
 async function bootstrap(): Promise<void> {
   const config = loadEnvConfig();
   const validation = validateEnvConfig(config);
-  const { server, wss, workerClient, visionService, controllerService, logger } =
-    createBackendApp(config);
+  const {
+    server,
+    wss,
+    workerClient,
+    visionService,
+    controllerService,
+    runtimeOrchestrator,
+    logger,
+  } = createBackendApp(config);
 
   for (const warn of validation.warnings) {
     logger.warn('Environment warning', { detail: warn });
@@ -19,6 +26,7 @@ async function bootstrap(): Promise<void> {
   }
 
   workerClient.start();
+  void runtimeOrchestrator.recoverInterruptedSessions().catch(() => {});
 
   server.listen(config.port, config.host, () => {
     logger.info(`Backend listening on http://${config.host}:${config.port}`);
@@ -34,6 +42,7 @@ async function bootstrap(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info(`Received ${signal}, shutting down gracefully...`);
+    await runtimeOrchestrator.stopSession('Backend shutdown').catch(() => {});
     await visionService.stopMonitor().catch(() => {});
     await controllerService.releaseAll().catch(() => {});
     wss.close();
