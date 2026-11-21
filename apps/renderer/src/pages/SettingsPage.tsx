@@ -1,10 +1,14 @@
-import { History, Info, Moon, Palette, Shield, Sun } from 'lucide-react';
-import { useState } from 'react';
-import type { AppInfo, SystemLogEntry } from '@ngegame/shared';
+import { Database, Download, History, Info, Moon, Palette, RefreshCw, RotateCcw, Shield, Sun } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import type { AppInfo, SystemLogEntry, UpdateCheckFrequency, UpdateState } from '@ngegame/shared';
+import { AppSelect } from '../components/ui/AppSelect.js';
 import { ObsLogo, SteamLogo, TwitchLogo, YouTubeLogo } from '../components/ui/BrandIcons.js';
+import { ConfirmDialog } from '../components/ui/FeedbackComponents.js';
 import { NgegameLogo } from '../components/ui/OverthinkerLogo.js';
 import { PageHeader } from '../components/ui/PageHeader.js';
 import { Panel } from '../components/ui/Panel.js';
+import { StatCard } from '../components/ui/StatCard.js';
+import { StatusBadge } from '../components/ui/StatusBadge.js';
 import { useTheme } from '../context/ThemeContext.js';
 import { backendService } from '../services/backendService.js';
 import type { PageId, ThemeAccent } from '../types/dashboard.js';
@@ -13,10 +17,12 @@ import { SessionHistoryPage } from './SessionHistoryPage.js';
 interface SettingsPageProps {
   appInfo: AppInfo | null;
   logs?: SystemLogEntry[];
+  initialTab?: SettingsTab;
   onNavigate?: (page: PageId) => void;
+  onNotify?: (message: string, type?: 'info' | 'success' | 'error') => void;
 }
 
-type SettingsTab = 'appearance' | 'integrations' | 'history' | 'about';
+export type SettingsTab = 'appearance' | 'integrations' | 'updates' | 'history' | 'about';
 
 const ACCENT_OPTIONS: { id: ThemeAccent; label: string; desc: string; swatch: string }[] = [
   { id: 'violet', label: 'Studio Violet', desc: 'Ungu futuristik (#8B5CF6)', swatch: 'bg-[#8B5CF6]' },
@@ -28,21 +34,74 @@ const ACCENT_OPTIONS: { id: ThemeAccent; label: string; desc: string; swatch: st
 export function SettingsPage({
   appInfo,
   logs = [],
+  initialTab = 'appearance',
   onNavigate,
+  onNotify,
 }: SettingsPageProps): React.JSX.Element {
   const { mode, setMode, accent, setAccent } = useTheme();
-  const [tab, setTab] = useState<SettingsTab>('appearance');
+  const [tab, setTab] = useState<SettingsTab>(initialTab);
+  const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+  const [confirmInstallOpen, setConfirmInstallOpen] = useState(false);
+  const [busyUpdate, setBusyUpdate] = useState(false);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
+
+  useEffect(() => {
+    void backendService.getUpdaterState().then(setUpdateState).catch(() => undefined);
+    return backendService.onUpdaterStateChanged((st) => setUpdateState(st));
+  }, []);
+
+  const handleCheckUpdates = async (): Promise<void> => {
+    setBusyUpdate(true);
+    try {
+      const st = await backendService.checkForUpdates();
+      setUpdateState(st);
+      if (st.updateAvailable) {
+        onNotify?.(`Pembaruan v${st.latestVersion} tersedia.`, 'info');
+      } else if (!st.error) {
+        onNotify?.('Aplikasi sudah menggunakan versi terbaru.', 'success');
+      }
+    } finally {
+      setBusyUpdate(false);
+    }
+  };
+
+  const handleDownloadUpdate = async (): Promise<void> => {
+    setBusyUpdate(true);
+    try {
+      const st = await backendService.downloadUpdate();
+      setUpdateState(st);
+    } finally {
+      setBusyUpdate(false);
+    }
+  };
+
+  const handleInstallUpdate = async (stopActiveTasks: boolean): Promise<void> => {
+    setBusyUpdate(true);
+    try {
+      const st = await backendService.installUpdate({ confirmed: true, stopActiveTasks });
+      setUpdateState(st);
+      if (st.activeTasksBlocking) {
+        setConfirmInstallOpen(true);
+      }
+    } finally {
+      setBusyUpdate(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Pengaturan Aplikasi"
-        description="Konfigurasi tampilan gelap/terang, akses cepat modul AI/Suara/OBS, keamanan, riwayat sesi, dan tentang aplikasi."
+        description="Konfigurasi tampilan gelap/terang, akses cepat modul AI/Suara/OBS, pembaruan aplikasi, riwayat sesi, dan tentang aplikasi."
         actions={
-          <div className="inline-flex rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1">
+          <div className="inline-flex flex-wrap rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1">
             {[
               { id: 'appearance' as SettingsTab, label: 'Tampilan', icon: Palette },
               { id: 'integrations' as SettingsTab, label: 'Layanan & Keamanan', icon: Shield },
+              { id: 'updates' as SettingsTab, label: 'Pembaruan', icon: Download },
               { id: 'history' as SettingsTab, label: 'Riwayat Sesi', icon: History },
               { id: 'about' as SettingsTab, label: 'Tentang', icon: Info },
             ].map((item) => {
@@ -170,6 +229,193 @@ export function SettingsPage({
             ))}
           </div>
         </Panel>
+      )}
+
+      {tab === 'updates' && (
+        <div className="space-y-6">
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Versi Saat Ini"
+              value={`v${updateState?.currentVersion ?? appInfo?.version ?? '0.1.0'}`}
+              meta={updateState?.isPackaged ? 'Aplikasi Terinstal' : 'Mode Pengembangan'}
+            />
+            <StatCard
+              label="Versi Terbaru"
+              value={updateState?.latestVersion ? `v${updateState.latestVersion}` : '-'}
+              meta={updateState?.releaseDate ? `Rilis: ${new Date(updateState.releaseDate).toLocaleDateString('id-ID')}` : 'Belum diperiksa'}
+              badge={
+                <StatusBadge
+                  variant={updateState?.updateAvailable ? 'info' : updateState?.status === 'error' ? 'warning' : 'healthy'}
+                  label={updateState?.updateAvailable ? 'Tersedia' : updateState?.status ?? 'idle'}
+                />
+              }
+            />
+            <StatCard
+              label="Progres Unduhan"
+              value={updateState?.progress ? `${updateState.progress.percent}%` : '-'}
+              meta={
+                updateState?.progress?.bytesPerSecond
+                  ? `${Math.round(updateState.progress.bytesPerSecond / 1024)} KB/s`
+                  : 'Siaga'
+              }
+            />
+            <StatCard
+              label="Terakhir Dicek"
+              value={updateState?.lastCheckedAt ? new Date(updateState.lastCheckedAt).toLocaleTimeString('id-ID') : 'Belum pernah'}
+              meta={updateState?.lastBackupPath ? 'Backup SQLite siap' : 'Backup otomatis sebelum install'}
+            />
+          </section>
+
+          <Panel
+            title="Pusat Pembaruan (GitHub Releases)"
+            subtitle="Sumber resmi HTTPS: OverthinkerID/Ngegame • Verifikasi signature & backup SQLite otomatis sebelum instalasi."
+            action={
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={busyUpdate}
+                  onClick={() => void handleCheckUpdates()}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--accent-primary)]/45 bg-[var(--accent-primary-soft)] px-3 text-xs font-semibold text-[var(--text-primary)] disabled:opacity-50"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> Check for Updates
+                </button>
+                <button
+                  type="button"
+                  disabled={busyUpdate || !updateState?.updateAvailable || updateState?.status === 'downloaded'}
+                  onClick={() => void handleDownloadUpdate()}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-xs text-[var(--text-primary)] disabled:opacity-40"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download Update
+                </button>
+                <button
+                  type="button"
+                  disabled={busyUpdate || updateState?.status !== 'downloaded'}
+                  onClick={() => setConfirmInstallOpen(true)}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 text-xs font-semibold text-emerald-500 disabled:opacity-40"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Install &amp; Restart
+                </button>
+              </div>
+            }
+          >
+            <div className="space-y-4 text-xs">
+              {updateState?.error && (
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-500">
+                  {updateState.error}
+                </div>
+              )}
+              {updateState?.progress && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px] text-[var(--text-secondary)]">
+                    <span>Mengunduh paket pembaruan...</span>
+                    <span>{updateState.progress.percent}%</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-secondary)]">
+                    <div
+                      className="h-full bg-[var(--accent-primary)] transition-all"
+                      style={{ width: `${Math.min(100, updateState.progress.percent)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+                <div className="font-semibold text-[var(--text-primary)]">Catatan Rilis (Release Notes)</div>
+                <pre className="mt-2 whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                  {updateState?.releaseNotes ?? 'Belum ada catatan rilis baru.'}
+                </pre>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel
+            title="Preferensi Pembaruan &amp; Keamanan Data"
+            subtitle="Default aman: cek otomatis aktif, unduh otomatis nonaktif, dan konfirmasi instalasi aktif."
+            action={
+              <button
+                type="button"
+                onClick={() =>
+                  void backendService.backupUserDatabase().then((res) => {
+                    onNotify?.(
+                      res.backupPath ? `Backup SQLite disimpan: ${res.backupPath}` : 'Database lokal belum dibuat.',
+                      res.backupPath ? 'success' : 'info',
+                    );
+                  })
+                }
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-xs text-[var(--text-primary)]"
+              >
+                <Database className="h-3.5 w-3.5" /> Backup SQLite Sekarang
+              </button>
+            }
+          >
+            <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+              {[
+                { key: 'autoCheck' as const, label: 'Pemeriksaan update otomatis' },
+                { key: 'autoDownload' as const, label: 'Unduh pembaruan otomatis' },
+                { key: 'requireInstallConfirmation' as const, label: 'Konfirmasi manual sebelum install & restart' },
+                { key: 'allowPrerelease' as const, label: 'Ikut saluran Pre-release (beta)' },
+              ].map((pref) => {
+                const checked = Boolean(updateState?.preferences[pref.key]);
+                return (
+                  <label
+                    key={pref.key}
+                    className="flex cursor-pointer items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-2.5"
+                  >
+                    <span className="text-[var(--text-primary)]">{pref.label}</span>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        void backendService
+                          .updateUpdatePreferences({ [pref.key]: e.target.checked })
+                          .then((prefs) =>
+                            setUpdateState((prev) => (prev ? { ...prev, preferences: prefs } : prev)),
+                          )
+                      }
+                      className="h-4 w-4 accent-[var(--accent-primary)]"
+                    />
+                  </label>
+                );
+              })}
+              <div className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-2">
+                <span className="text-[var(--text-primary)]">Frekuensi Pemeriksaan</span>
+                <AppSelect
+                  value={updateState?.preferences.checkFrequency ?? 'startup'}
+                  onChange={(v) =>
+                    void backendService
+                      .updateUpdatePreferences({ checkFrequency: v as UpdateCheckFrequency })
+                      .then((prefs) =>
+                        setUpdateState((prev) => (prev ? { ...prev, preferences: prefs } : prev)),
+                      )
+                  }
+                  options={[
+                    { value: 'startup', label: 'Saat Startup' },
+                    { value: 'daily', label: 'Harian' },
+                    { value: 'weekly', label: 'Mingguan' },
+                    { value: 'manual', label: 'Manual Saja' },
+                  ]}
+                  className="w-36"
+                />
+              </div>
+            </div>
+          </Panel>
+
+          <ConfirmDialog
+            open={confirmInstallOpen}
+            title="Pasang Pembaruan & Restart Aplikasi?"
+            description={
+              updateState?.activeTasksReason
+                ? `Aktivitas aktif terdeteksi (${updateState.activeTasksReason}). Aplikasi akan menghentikan AI/siaran secara aman dan mem-backup database SQLite sebelum restart.`
+                : 'Database SQLite userData akan di-backup otomatis sebelum aplikasi di-restart untuk memasang pembaruan.'
+            }
+            confirmLabel="Hentikan Tugas Aktif & Install"
+            cancelLabel="Batal"
+            onCancel={() => setConfirmInstallOpen(false)}
+            onConfirm={() => {
+              setConfirmInstallOpen(false);
+              void handleInstallUpdate(true);
+            }}
+          />
+        </div>
       )}
 
       {tab === 'history' && <SessionHistoryPage logs={logs} />}
