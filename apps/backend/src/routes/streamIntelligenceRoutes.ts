@@ -12,6 +12,7 @@ import {
 import { ChatIntelligenceService } from '../services/streamIntelligence/chatIntelligenceService.js';
 import { GameplayEventIntelligenceService } from '../services/streamIntelligence/gameplayEventIntelligenceService.js';
 import { LiveCommentaryService } from '../services/streamIntelligence/liveCommentaryService.js';
+import { SceneIntelligenceService } from '../services/streamIntelligence/sceneIntelligenceService.js';
 import { VoicePersonalityService } from '../services/streamIntelligence/voicePersonalityService.js';
 
 export function createStreamIntelligenceRouter(
@@ -19,6 +20,7 @@ export function createStreamIntelligenceRouter(
   commentaryService = new LiveCommentaryService(),
   voicePersonalityService = new VoicePersonalityService(),
   chatIntelligenceService = new ChatIntelligenceService(),
+  sceneIntelligenceService = new SceneIntelligenceService(),
 ): Router {
   const router = Router();
 
@@ -283,6 +285,59 @@ export function createStreamIntelligenceRouter(
       }
       const log = await chatIntelligenceService.approveModeration(id);
       res.json({ ok: true, log });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/scene', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = await sceneIntelligenceService.getStatus();
+      res.json({ ok: true, ...status });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/scene/analyze', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const recommendation = await sceneIntelligenceService.analyzeContext(req.body ?? {});
+      res.json({ ok: true, recommendation });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.put('/scene/config', (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const config = sceneIntelligenceService.updateConfig(req.body ?? {});
+      res.json({ ok: true, config });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/scene/approve', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.body?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new AppError('id rekomendasi scene tidak valid', ErrorCode.VALIDATION_ERROR, 400);
+      }
+      const recommendation = await sceneIntelligenceService.approveRecommendation(id);
+      res.json({ ok: true, recommendation });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/scene/reject', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.body?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new AppError('id rekomendasi scene tidak valid', ErrorCode.VALIDATION_ERROR, 400);
+      }
+      const recommendation = await sceneIntelligenceService.rejectRecommendation(id);
+      res.json({ ok: true, recommendation });
     } catch (err) {
       next(err);
     }

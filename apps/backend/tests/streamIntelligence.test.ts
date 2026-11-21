@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { ChatIntelligenceService } from '../src/services/streamIntelligence/chatIntelligenceService.js';
 import { GameplayEventIntelligenceService } from '../src/services/streamIntelligence/gameplayEventIntelligenceService.js';
 import { LiveCommentaryService } from '../src/services/streamIntelligence/liveCommentaryService.js';
+import { SceneIntelligenceService } from '../src/services/streamIntelligence/sceneIntelligenceService.js';
 import { VoicePersonalityService } from '../src/services/streamIntelligence/voicePersonalityService.js';
 
-describe('Phase 16.2–16.5: Stream Intelligence Engine', () => {
+describe('Phase 16.2–16.6: Stream Intelligence Engine', () => {
   it('rejects unverified controller-only claims and detects verified Stardew Valley events with WS broadcast', async () => {
     const emitted: Array<{ eventType: string; payload: unknown }> = [];
     const service = new GameplayEventIntelligenceService((eventType, payload) => {
@@ -222,5 +223,46 @@ describe('Phase 16.2–16.5: Stream Intelligence Engine', () => {
 
     const st = await chat.getStatus(10);
     assert.ok(st.moderationLogs.some((l) => l.status === 'suggested'));
+  });
+
+  it('analyzes gameplay context for OBS scene, overlay, camera visibility, custom rules, and WS broadcast', async () => {
+    const emitted: Array<{ eventType: string; payload: unknown }> = [];
+    const switchedScenes: string[] = [];
+    const mockObs = {
+      isConnected: () => true,
+      request: async (reqType: string, data?: Record<string, unknown>) => {
+        if (reqType === 'GetSceneList') {
+          return {
+            currentProgramSceneName: 'Gameplay',
+            scenes: [{ sceneName: 'Gameplay' }, { sceneName: 'Pause / BRB' }],
+          };
+        }
+        if (reqType === 'GetStreamStatus') {
+          return { outputActive: true };
+        }
+        if (reqType === 'SetCurrentProgramScene') {
+          switchedScenes.push(String(data?.sceneName ?? ''));
+          return {};
+        }
+        return {};
+      },
+    } as unknown as import('../src/services/streaming/obsWebSocketClient.js').ObsWebSocketClient;
+
+    const sceneSvc = new SceneIntelligenceService((eventType, payload) => {
+      emitted.push({ eventType, payload });
+    }, mockObs);
+
+    const rec = await sceneSvc.analyzeContext({ sceneLabel: 'pause_menu' });
+    assert.ok(rec);
+    assert.equal(rec?.recommendedScene, 'Pause / BRB');
+    assert.equal(rec?.recommendedOverlay, 'BRB Overlay');
+    assert.equal(rec?.cameraVisible, false);
+    assert.equal(rec?.status, 'pending');
+    assert.equal(switchedScenes.length, 0);
+    assert.ok(emitted.some((e) => e.eventType === 'stream:scene-recommended'));
+
+    const approved = await sceneSvc.approveRecommendation(rec!.id);
+    assert.equal(approved.status, 'executed');
+    assert.deepEqual(switchedScenes, ['Pause / BRB']);
   });
 });

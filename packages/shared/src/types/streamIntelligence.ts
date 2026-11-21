@@ -209,4 +209,43 @@ export interface ChatIntelligenceStatusResponse {
   moderationLogs: ChatModerationLogItem[];
 }
 
+export type StreamPhase = 'idle' | 'starting' | 'live' | 'ending';
+
+export interface SceneAutomationRule {
+  id: string;
+  name: string;
+  triggerSceneLabel: string;
+  targetObsScene: string;
+  recommendedOverlay?: string | null;
+  cameraVisible?: boolean | null;
+  enabled: boolean;
+}
+
+export interface SceneIntelligenceConfig {
+  autoSwitchEnabled: boolean;
+  rules: SceneAutomationRule[];
+}
+
+export interface SceneRecommendationItem {
+  id: number;
+  currentScene: string | null;
+  recommendedScene: string | null;
+  recommendedOverlay: string | null;
+  cameraVisible: boolean | null;
+  streamPhase: StreamPhase;
+  reason: string;
+  confidence: number;
+  status: 'pending' | 'approved' | 'executed' | 'rejected';
+  createdAt: string;
+}
+
+export interface SceneIntelligenceStatusResponse {
+  obsConnected: boolean;
+  currentScene: string | null;
+  streamPhase: StreamPhase;
+  config: SceneIntelligenceConfig;
+  recommendations: SceneRecommendationItem[];
+}
+
+
 
