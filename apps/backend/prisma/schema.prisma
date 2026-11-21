@@ -280,3 +280,26 @@ model AdaptationProposal {
 
   @@index([gameId, status, createdAt])
 }
+
+model StreamEvent {
+  id             Int      @id @default(autoincrement())
+  gameId         String
+  windowTitle    String
+  eventType      String
+  severity       String   @default("low")
+  title          String
+  description    String
+  confidence     Float    @default(0.5)
+  verifiedByJson String   @default("[]")
+  ocrExcerpt     String?
+  motionScore    Float    @default(0)
+  sceneLabel     String
+  metadataJson   String   @default("{}")
+  sessionId      Int?
+  visionId       Int?
+  createdAt      DateTime @default(now())
+
+  @@index([gameId, eventType, createdAt])
+  @@index([createdAt])
+}
+
