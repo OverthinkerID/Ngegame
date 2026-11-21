@@ -303,3 +303,22 @@ model StreamEvent {
   @@index([createdAt])
 }
 
+model CommentaryHistory {
+  id              Int      @id @default(autoincrement())
+  eventId         Int?
+  gameId          String
+  personality     String   @default("casual")
+  language        String   @default("id")
+  text            String
+  editedText      String?
+  priority        Int      @default(1)
+  status          String   @default("ready")
+  verifiedContext String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([gameId, createdAt])
+  @@index([status, createdAt])
+}
+
+

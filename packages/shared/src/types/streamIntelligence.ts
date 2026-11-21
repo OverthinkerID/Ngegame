@@ -56,3 +56,48 @@ export interface StreamIntelligenceStatus {
   totalEventsDetected: number;
   recentEvents: VerifiedGameplayEvent[];
 }
+
+export type CommentaryPersonality = 'casual' | 'funny' | 'professional' | 'cinematic';
+
+export type CommentaryLanguage = 'id' | 'en' | 'ja';
+
+export interface CommentaryConfig {
+  personality: CommentaryPersonality;
+  language: CommentaryLanguage;
+  cooldownSeconds: number;
+  silenceThresholdSeconds: number;
+  maxQueueSize: number;
+  muted: boolean;
+  autoGenerateOnEvent: boolean;
+}
+
+export interface CommentaryItem {
+  id: number;
+  eventId: number | null;
+  gameId: string;
+  personality: CommentaryPersonality;
+  language: CommentaryLanguage;
+  text: string;
+  editedText: string | null;
+  priority: number;
+  status:
+    | 'queued'
+    | 'ready'
+    | 'spoken'
+    | 'edited'
+    | 'cancelled'
+    | 'skipped_duplicate'
+    | 'skipped_cooldown';
+  verifiedContext: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommentaryStatusResponse {
+  config: CommentaryConfig;
+  silenceDetected: boolean;
+  secondsSinceLastCommentary: number;
+  lastCommentaryAt: string | null;
+  queue: CommentaryItem[];
+  history: CommentaryItem[];
+}
