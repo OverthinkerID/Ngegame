@@ -19,6 +19,7 @@ import {
 import { ThemeProvider } from './context/ThemeContext.js';
 import { AIControlPage } from './pages/AIControlPage.js';
 import { AnalyticsPage } from './pages/AnalyticsPage.js';
+import { GameAdaptationStudioPage } from './pages/GameAdaptationStudioPage.js';
 import { GameAdaptersPage } from './pages/GameAdaptersPage.js';
 import { GameLibraryPage } from './pages/GameLibraryPage.js';
 import { LiveStreamingPage } from './pages/LiveStreamingPage.js';
@@ -28,7 +29,7 @@ import { SettingsPage } from './pages/SettingsPage.js';
 import { SystemMonitorPage } from './pages/SystemMonitorPage.js';
 import { VisionMonitorPage } from './pages/VisionMonitorPage.js';
 import { VoiceStudioPage } from './pages/VoiceStudioPage.js';
-import { backendService } from './services/backendService.js';
+import { BACKEND_WS_URL, backendService } from './services/backendService.js';
 import type { PageId } from './types/dashboard.js';
 import { parseFriendlyError } from './utils/guideHelper.js';
 
@@ -163,6 +164,50 @@ function DashboardShell(): React.JSX.Element {
   }, [refreshBackendData]);
 
   useEffect(() => {
+    let closed = false;
+    let ws: WebSocket | null = null;
+    let retryTimer: number | null = null;
+    let attempt = 0;
+
+    const connect = (): void => {
+      if (closed) return;
+      const wsUrl = appInfo?.backendUrl
+        ? `${appInfo.backendUrl.replace(/^http/, 'ws')}/ws`
+        : BACKEND_WS_URL;
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        attempt = 0;
+      };
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(String(evt.data)) as { type?: string };
+          if (msg.type === 'runtime:state' || msg.type === 'runtime:cycle') {
+            void refreshBackendData(true);
+          }
+        } catch {
+          // Abaikan payload non-JSON
+        }
+      };
+      ws.onclose = () => {
+        if (closed) return;
+        attempt += 1;
+        const delayMs = Math.min(1500 * attempt, 5000);
+        retryTimer = window.setTimeout(connect, delayMs);
+      };
+      ws.onerror = () => {
+        ws?.close();
+      };
+    };
+
+    connect();
+    return () => {
+      closed = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      ws?.close();
+    };
+  }, [appInfo?.backendUrl, refreshBackendData]);
+
+  useEffect(() => {
     if (!toast) return;
     const duration = toast.guideUrl ? 6500 : 3500;
     const id = window.setTimeout(() => setToast(null), duration);
@@ -194,6 +239,8 @@ function DashboardShell(): React.JSX.Element {
         return <VisionMonitorPage />;
       case 'adapters':
         return <GameAdaptersPage />;
+      case 'adaptation-studio':
+        return <GameAdaptationStudioPage onNotify={showNotify} />;
       case 'streaming':
         return <LiveStreamingPage onNotify={showNotify} />;
       case 'voice':

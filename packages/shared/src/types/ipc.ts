@@ -1,4 +1,14 @@
 import type {
+  CalibrationSessionState,
+  GameBrainCycleResult,
+  GameMemoryRecord,
+  GameProfile,
+  GameProfileVersionRecord,
+  PipelineDiagnosticsReport,
+  StardewCapabilityLevel,
+  SteamScannerDiagnostics,
+} from './adaptation.js';
+import type {
   AnalyticsSummaryReport,
   ResourceMetricsSnapshot,
   ThrottlingConfig,
@@ -68,6 +78,9 @@ export const IPC_CHANNELS = {
   STEAM_SCAN: 'steam:scan',
   STEAM_LAUNCH: 'steam:launch',
   STEAM_STOP: 'steam:stop',
+  STEAM_MANUAL_LIBS_LIST: 'steam:manual-libs-list',
+  STEAM_MANUAL_LIBS_ADD: 'steam:manual-libs-add',
+  STEAM_MANUAL_LIBS_REMOVE: 'steam:manual-libs-remove',
   VISION_STATUS: 'vision:status',
   VISION_WINDOWS: 'vision:windows',
   VISION_CAPTURE_ONCE: 'vision:capture-once',
@@ -125,6 +138,23 @@ export const IPC_CHANNELS = {
   ANALYTICS_THROTTLE_GET: 'analytics:throttle-get',
   ANALYTICS_THROTTLE_UPDATE: 'analytics:throttle-update',
   ANALYTICS_EXPORT: 'analytics:export',
+  ADAPTATION_DIAGNOSTICS: 'adaptation:diagnostics',
+  ADAPTATION_STEAM_DIAGNOSTICS: 'adaptation:steam-diagnostics',
+  ADAPTATION_PROFILES_LIST: 'adaptation:profiles-list',
+  ADAPTATION_PROFILE_GET: 'adaptation:profile-get',
+  ADAPTATION_PROFILE_SAVE: 'adaptation:profile-save',
+  ADAPTATION_PROFILE_RESET: 'adaptation:profile-reset',
+  ADAPTATION_PROFILE_IMPORT: 'adaptation:profile-import',
+  ADAPTATION_PROFILE_EXPORT: 'adaptation:profile-export',
+  ADAPTATION_PROFILE_DUPLICATE: 'adaptation:profile-duplicate',
+  ADAPTATION_PROFILE_DELETE: 'adaptation:profile-delete',
+  ADAPTATION_PROFILE_HISTORY: 'adaptation:profile-history',
+  ADAPTATION_BRAIN_CYCLE: 'adaptation:brain-cycle',
+  ADAPTATION_MEMORY_LIST: 'adaptation:memory-list',
+  ADAPTATION_MEMORY_CLEAR: 'adaptation:memory-clear',
+  ADAPTATION_CALIBRATION_GET: 'adaptation:calibration-get',
+  ADAPTATION_CALIBRATION_STEP: 'adaptation:calibration-step',
+  ADAPTATION_STARDEW_CAPS: 'adaptation:stardew-caps',
 } as const;
 
 export interface AppInfo {
@@ -148,6 +178,9 @@ export interface NgegameBridgeAPI {
   scanSteamLibrary: () => Promise<SteamScanResult>;
   launchSteamGame: (appId: number) => Promise<SteamLaunchResult>;
   stopSteamGame: (appId: number) => Promise<SteamStopResult>;
+  getManualSteamLibraries: () => Promise<string[]>;
+  addManualSteamLibrary: (libraryPath: string) => Promise<string[]>;
+  removeManualSteamLibrary: (libraryPath: string) => Promise<string[]>;
   getVisionStatus: () => Promise<VisionMonitorStatus>;
   listVisionWindows: () => Promise<DetectedWindow[]>;
   captureVisionOnce: (options?: { windowTitle?: string; sourcePath?: string }) => Promise<VisionAnalysisResult>;
@@ -206,4 +239,21 @@ export interface NgegameBridgeAPI {
   getThrottlingConfig: () => Promise<ThrottlingConfig>;
   updateThrottlingConfig: (partial: Partial<ThrottlingConfig>) => Promise<ThrottlingConfig>;
   exportAnalyticsReport: (format: 'json' | 'csv') => Promise<string>;
+  getAdaptationDiagnostics: () => Promise<PipelineDiagnosticsReport>;
+  getSteamDiagnostics: () => Promise<SteamScannerDiagnostics | null>;
+  listGameProfiles: () => Promise<GameProfile[]>;
+  getGameProfile: (gameId: string) => Promise<{ profile: GameProfile; validation: { valid: boolean; errors: string[]; warnings: string[] } }>;
+  saveGameProfile: (profile: GameProfile) => Promise<GameProfile>;
+  resetGameProfile: (gameId: string) => Promise<GameProfile>;
+  importGameProfile: (json: string) => Promise<GameProfile>;
+  exportGameProfile: (gameId: string) => Promise<string>;
+  duplicateGameProfile: (sourceGameId: string, newGameId: string, newGameName: string) => Promise<GameProfile>;
+  deleteGameProfile: (gameId: string) => Promise<{ deleted: boolean; gameId: string }>;
+  getGameProfileHistory: (gameId: string, limit?: number) => Promise<GameProfileVersionRecord[]>;
+  runGameBrainCycle: (req: { gameId: string; windowTitle?: string; dryRun?: boolean; goalOverride?: string }) => Promise<GameBrainCycleResult>;
+  listGameMemories: (gameId: string, limit?: number) => Promise<GameMemoryRecord[]>;
+  clearGameMemories: (gameId: string) => Promise<number>;
+  getCalibrationState: (gameId: string) => Promise<CalibrationSessionState>;
+  runCalibrationStep: (gameId: string, step: number) => Promise<CalibrationSessionState>;
+  getStardewCapabilities: (level?: StardewCapabilityLevel) => Promise<{ currentLevel: StardewCapabilityLevel; levels: Record<number, { title: string; capabilities: string[]; smapiNote?: string }> }>;
 }

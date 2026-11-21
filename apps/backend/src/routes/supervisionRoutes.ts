@@ -83,6 +83,36 @@ export function createSupervisionRouter(supervisionService: SupervisionService):
     }
   });
 
+  router.post('/stop-task', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await supervisionService.stopTask());
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/risk-assess', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as Partial<SupervisionSubmitRequest> | undefined;
+      if (!body || typeof body.actionType !== 'string' || typeof body.confidence !== 'number') {
+        throw new AppError(
+          'actionType and numeric confidence are required',
+          ErrorCode.VALIDATION_ERROR,
+          400,
+        );
+      }
+      const assessment = supervisionService.assessActionRisk(
+        body.actionType,
+        body.target ?? '',
+        body.rationale ?? '',
+        body.confidence,
+      );
+      res.json({ ok: true, assessment });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.get('/queue', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rawLimit =
