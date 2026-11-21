@@ -247,5 +247,28 @@ export interface SceneIntelligenceStatusResponse {
   recommendations: SceneRecommendationItem[];
 }
 
+export interface HighlightCandidateItem {
+  id: number;
+  eventId: number | null;
+  gameId: string;
+  eventType: GameplayEventType;
+  title: string;
+  highlightScore: number;
+  eventTimestamp: string;
+  startOffsetSeconds: number;
+  endOffsetSeconds: number;
+  clipSupported: boolean;
+  recordingSource: string | null;
+  status: 'pending' | 'approved' | 'rejected' | 'exported';
+  createdAt: string;
+}
+
+export interface StreamHighlightsStatusResponse {
+  recordingActive: boolean;
+  replayBufferAvailable: boolean;
+  candidates: HighlightCandidateItem[];
+}
+
+
 
 

@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { ChatIntelligenceService } from '../src/services/streamIntelligence/chatIntelligenceService.js';
 import { GameplayEventIntelligenceService } from '../src/services/streamIntelligence/gameplayEventIntelligenceService.js';
 import { LiveCommentaryService } from '../src/services/streamIntelligence/liveCommentaryService.js';
+import { HighlightIntelligenceService } from '../src/services/streamIntelligence/highlightIntelligenceService.js';
 import { SceneIntelligenceService } from '../src/services/streamIntelligence/sceneIntelligenceService.js';
 import { VoicePersonalityService } from '../src/services/streamIntelligence/voicePersonalityService.js';
 
-describe('Phase 16.2–16.6: Stream Intelligence Engine', () => {
+describe('Phase 16.2–16.7: Stream Intelligence Engine', () => {
   it('rejects unverified controller-only claims and detects verified Stardew Valley events with WS broadcast', async () => {
     const emitted: Array<{ eventType: string; payload: unknown }> = [];
     const service = new GameplayEventIntelligenceService((eventType, payload) => {
@@ -264,5 +265,49 @@ describe('Phase 16.2–16.6: Stream Intelligence Engine', () => {
     const approved = await sceneSvc.approveRecommendation(rec!.id);
     assert.equal(approved.status, 'executed');
     assert.deepEqual(switchedScenes, ['Pause / BRB']);
+  });
+
+  it('detects stream highlights honestly based on OBS recording status, supports approval, and exports metadata', async () => {
+    const emitted: Array<{ eventType: string; payload: unknown }> = [];
+    const eventSvc = new GameplayEventIntelligenceService();
+    const obs = await eventSvc.analyzeObservation({
+      windowTitle: 'Stardew Valley',
+      sceneLabel: 'active_gameplay',
+      motionScore: 0.2,
+      ocrText: 'Achievement unlocked: Greenhorn!',
+    });
+    const ev = obs.events[0]!;
+
+    const hlNoRec = new HighlightIntelligenceService((eventType, payload) => {
+      emitted.push({ eventType, payload });
+    });
+    const candNoRec = await hlNoRec.detectFromEvent(ev);
+    assert.ok(candNoRec);
+    assert.equal(candNoRec?.clipSupported, false);
+    assert.equal(candNoRec?.recordingSource, null);
+    assert.ok(emitted.some((e) => e.eventType === 'stream:highlight-detected'));
+
+    const mockObsRec = {
+      isConnected: () => true,
+      request: async (reqType: string) => {
+        if (reqType === 'GetRecordStatus') {
+          return { outputActive: true, outputDuration: 120000 };
+        }
+        throw new Error('Replay buffer disabled');
+      },
+    } as unknown as import('../src/services/streaming/obsWebSocketClient.js').ObsWebSocketClient;
+    const hlWithRec = new HighlightIntelligenceService(undefined, mockObsRec);
+    const candRec = await hlWithRec.detectFromEvent(ev);
+    assert.ok(candRec);
+    assert.equal(candRec?.clipSupported, true);
+    assert.equal(candRec?.recordingSource, 'obs-recording');
+    assert.equal(candRec?.startOffsetSeconds, 105);
+    assert.equal(candRec?.endOffsetSeconds, 135);
+
+    const approved = await hlWithRec.approveHighlight(candRec!.id);
+    assert.equal(approved.status, 'approved');
+
+    const csv = await hlWithRec.exportMetadata('csv');
+    assert.ok(csv.includes('highlightScore'));
   });
 });

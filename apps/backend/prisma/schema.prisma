@@ -381,6 +381,26 @@ model SceneRecommendation {
   @@index([status, createdAt])
 }
 
+model HighlightCandidate {
+  id                 Int      @id @default(autoincrement())
+  eventId            Int?
+  gameId             String
+  eventType          String
+  title              String
+  highlightScore     Float    @default(50)
+  eventTimestamp     DateTime @default(now())
+  startOffsetSeconds Int      @default(0)
+  endOffsetSeconds   Int      @default(30)
+  clipSupported      Boolean  @default(false)
+  recordingSource    String?
+  status             String   @default("pending")
+  createdAt          DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([highlightScore])
+}
+
+
 
 
 

@@ -11,6 +11,7 @@ import {
 } from '@ngegame/shared';
 import { ChatIntelligenceService } from '../services/streamIntelligence/chatIntelligenceService.js';
 import { GameplayEventIntelligenceService } from '../services/streamIntelligence/gameplayEventIntelligenceService.js';
+import { HighlightIntelligenceService } from '../services/streamIntelligence/highlightIntelligenceService.js';
 import { LiveCommentaryService } from '../services/streamIntelligence/liveCommentaryService.js';
 import { SceneIntelligenceService } from '../services/streamIntelligence/sceneIntelligenceService.js';
 import { VoicePersonalityService } from '../services/streamIntelligence/voicePersonalityService.js';
@@ -21,6 +22,7 @@ export function createStreamIntelligenceRouter(
   voicePersonalityService = new VoicePersonalityService(),
   chatIntelligenceService = new ChatIntelligenceService(),
   sceneIntelligenceService = new SceneIntelligenceService(),
+  highlightService = new HighlightIntelligenceService(),
 ): Router {
   const router = Router();
 
@@ -338,6 +340,70 @@ export function createStreamIntelligenceRouter(
       }
       const recommendation = await sceneIntelligenceService.rejectRecommendation(id);
       res.json({ ok: true, recommendation });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/highlights', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = await highlightService.getStatus();
+      res.json({ ok: true, ...status });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/highlights/detect', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const events = await eventService.listEvents(20);
+      const eventId = req.body?.eventId ? Number(req.body.eventId) : undefined;
+      const target = eventId ? events.find((e) => e.id === eventId) : events[0];
+      if (!target) {
+        res.json({ ok: true, candidate: null, reason: 'Belum ada event gameplay terverifikasi.' });
+        return;
+      }
+      const candidate = await highlightService.detectFromEvent(
+        target,
+        req.body?.minScore !== undefined ? Number(req.body.minScore) : 55,
+      );
+      res.json({ ok: true, candidate });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/highlights/approve', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.body?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new AppError('id highlight tidak valid', ErrorCode.VALIDATION_ERROR, 400);
+      }
+      const candidate = await highlightService.approveHighlight(id);
+      res.json({ ok: true, candidate });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/highlights/reject', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.body?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new AppError('id highlight tidak valid', ErrorCode.VALIDATION_ERROR, 400);
+      }
+      const candidate = await highlightService.rejectHighlight(id);
+      res.json({ ok: true, candidate });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/highlights/export', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const format = req.query.format === 'csv' ? 'csv' : 'json';
+      const payload = await highlightService.exportMetadata(format);
+      res.type(format === 'csv' ? 'text/csv' : 'application/json').send(payload);
     } catch (err) {
       next(err);
     }
