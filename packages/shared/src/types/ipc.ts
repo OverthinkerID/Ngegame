@@ -163,6 +163,8 @@ export const IPC_CHANNELS = {
   UPDATER_GET_STATE: 'updater:get-state',
   UPDATER_CHECK: 'updater:check',
   UPDATER_DOWNLOAD: 'updater:download',
+  UPDATER_CANCEL_DOWNLOAD: 'updater:cancel-download',
+  UPDATER_RETRY_DOWNLOAD: 'updater:retry-download',
   UPDATER_INSTALL: 'updater:install',
   UPDATER_GET_PREFERENCES: 'updater:get-preferences',
   UPDATER_UPDATE_PREFERENCES: 'updater:update-preferences',
@@ -273,6 +275,8 @@ export interface NgegameBridgeAPI {
   getUpdaterState: () => Promise<UpdateState>;
   checkForUpdates: () => Promise<UpdateState>;
   downloadUpdate: () => Promise<UpdateState>;
+  cancelUpdateDownload?: () => Promise<UpdateState>;
+  retryUpdateDownload?: () => Promise<UpdateState>;
   installUpdate: (options?: UpdateInstallOptions) => Promise<UpdateState>;
   getUpdatePreferences: () => Promise<UpdatePreferences>;
   updateUpdatePreferences: (partial: Partial<UpdatePreferences>) => Promise<UpdatePreferences>;

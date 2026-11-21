@@ -902,6 +902,16 @@ function registerIpcHandlers(): void {
     return updateManager.downloadUpdate();
   });
 
+  ipcMain.handle(IPC_CHANNELS.UPDATER_CANCEL_DOWNLOAD, (): UpdateState => {
+    if (!updateManager) throw new Error('Updater belum siap');
+    return updateManager.cancelDownload();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.UPDATER_RETRY_DOWNLOAD, async (): Promise<UpdateState> => {
+    if (!updateManager) throw new Error('Updater belum siap');
+    return updateManager.retryDownload();
+  });
+
   ipcMain.handle(
     IPC_CHANNELS.UPDATER_INSTALL,
     async (_event, options?: UpdateInstallOptions): Promise<UpdateState> => {

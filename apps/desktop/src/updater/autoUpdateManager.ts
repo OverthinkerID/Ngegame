@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type {
+  UpdateChannel,
   UpdateInstallOptions,
   UpdatePreferences,
   UpdateState,
@@ -12,6 +13,7 @@ export const DEFAULT_UPDATE_PREFERENCES: UpdatePreferences = {
   requireInstallConfirmation: true,
   checkFrequency: 'startup',
   allowPrerelease: false,
+  channel: 'stable',
 };
 
 export function compareSemver(a: string, b: string): number {
@@ -99,7 +101,6 @@ export function backupDatabaseFile(
   const destPath = path.join(backupDir, `ngegame-pre-update-${safeVersion}-${stamp}.db`);
   fs.copyFileSync(dbPath, destPath);
 
-  // Retain at most 5 most recent backups
   try {
     const files = fs
       .readdirSync(backupDir)
@@ -130,7 +131,8 @@ export interface AutoUpdaterLike {
   allowPrerelease: boolean;
   setFeedURL: (options: { provider: 'github'; owner: string; repo: string }) => void;
   checkForUpdates: () => Promise<unknown>;
-  downloadUpdate: () => Promise<unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  downloadUpdate: (cancellationToken?: any) => Promise<unknown>;
   quitAndInstall: (isSilent?: boolean, isForceRunAfter?: boolean) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   on: (event: any, listener: (...args: any[]) => void) => unknown;
@@ -164,6 +166,7 @@ export class AutoUpdateManager {
   private readonly stopActiveTasksFn?: () => Promise<void>;
   private readonly log: (message: string) => void;
 
+  private activeCancelHandle: { cancel: () => void } | null = null;
   private state: UpdateState;
 
   constructor(options: AutoUpdateManagerOptions) {
@@ -179,6 +182,7 @@ export class AutoUpdateManager {
     this.log = options.log ?? (() => undefined);
 
     const preferences = this.loadPreferences();
+    const channel: UpdateChannel = preferences.allowPrerelease ? 'beta' : 'stable';
     this.state = {
       currentVersion: options.currentVersion,
       latestVersion: null,
@@ -186,6 +190,8 @@ export class AutoUpdateManager {
       updateAvailable: false,
       releaseNotes: null,
       releaseDate: null,
+      packageSizeBytes: null,
+      channel,
       progress: null,
       lastCheckedAt: null,
       lastBackupPath: null,
@@ -193,7 +199,7 @@ export class AutoUpdateManager {
       activeTasksReason: null,
       isPackaged: options.isPackaged,
       error: null,
-      preferences,
+      preferences: { ...preferences, channel },
     };
 
     if (this.updater) {
@@ -206,10 +212,12 @@ export class AutoUpdateManager {
     try {
       if (fs.existsSync(this.prefsPath)) {
         const raw = JSON.parse(fs.readFileSync(this.prefsPath, 'utf8')) as Partial<UpdatePreferences>;
-        return {
+        const merged = {
           ...DEFAULT_UPDATE_PREFERENCES,
           ...raw,
         };
+        merged.channel = merged.allowPrerelease ? 'beta' : 'stable';
+        return merged;
       }
     } catch {
       // Fallback to defaults
@@ -260,11 +268,15 @@ export class AutoUpdateManager {
         version?: string;
         releaseNotes?: unknown;
         releaseDate?: string;
+        files?: Array<{ size?: number }>;
       };
       const latestVersion = typeof info.version === 'string' ? info.version : null;
       const isNewer = latestVersion
         ? compareSemver(latestVersion, this.state.currentVersion) > 0
         : true;
+      const firstFileSize = Array.isArray(info.files) && typeof info.files[0]?.size === 'number'
+        ? info.files[0].size
+        : null;
 
       this.state = {
         ...this.state,
@@ -273,6 +285,7 @@ export class AutoUpdateManager {
         latestVersion,
         releaseNotes: formatReleaseNotes(info.releaseNotes),
         releaseDate: typeof info.releaseDate === 'string' ? info.releaseDate : null,
+        packageSizeBytes: firstFileSize,
         error: null,
       };
       this.emitState();
@@ -287,6 +300,7 @@ export class AutoUpdateManager {
         latestVersion:
           typeof info.version === 'string' ? info.version : this.state.currentVersion,
         releaseDate: typeof info.releaseDate === 'string' ? info.releaseDate : null,
+        packageSizeBytes: null,
         progress: null,
         error: null,
       };
@@ -303,6 +317,7 @@ export class AutoUpdateManager {
       this.state = {
         ...this.state,
         status: 'downloading',
+        packageSizeBytes: Number(p.total ?? this.state.packageSizeBytes ?? 0) || this.state.packageSizeBytes || null,
         progress: {
           percent: Number((p.percent ?? 0).toFixed(1)),
           bytesPerSecond: Number(p.bytesPerSecond ?? 0),
@@ -320,6 +335,7 @@ export class AutoUpdateManager {
         releaseNotes?: unknown;
         releaseDate?: string;
       };
+      this.activeCancelHandle = null;
       this.state = {
         ...this.state,
         status: 'downloaded',
@@ -342,6 +358,7 @@ export class AutoUpdateManager {
     });
 
     this.updater.on('error', (errRaw) => {
+      this.activeCancelHandle = null;
       const msg = errRaw instanceof Error ? errRaw.message : String(errRaw ?? 'Update error');
       this.state = {
         ...this.state,
@@ -362,11 +379,24 @@ export class AutoUpdateManager {
   }
 
   public updatePreferences(partial: Partial<UpdatePreferences>): UpdatePreferences {
+    let allowPrerelease =
+      partial.allowPrerelease !== undefined
+        ? partial.allowPrerelease
+        : this.state.preferences.allowPrerelease;
+    let channel: UpdateChannel = partial.channel ?? this.state.preferences.channel ?? 'stable';
+    if (partial.channel !== undefined) {
+      allowPrerelease = partial.channel === 'beta';
+    } else if (partial.allowPrerelease !== undefined) {
+      channel = partial.allowPrerelease ? 'beta' : 'stable';
+    }
+
     const next: UpdatePreferences = {
       ...this.state.preferences,
       ...partial,
+      allowPrerelease,
+      channel,
     };
-    this.state = { ...this.state, preferences: next };
+    this.state = { ...this.state, preferences: next, channel };
     this.savePreferences(next);
     this.applyPreferencesToUpdater();
     this.emitState();
@@ -430,22 +460,75 @@ export class AutoUpdateManager {
     }
 
     try {
+      let cancelled = false;
+      const cancelToken = {
+        cancelled: false,
+        cancel: () => {
+          cancelled = true;
+          cancelToken.cancelled = true;
+        },
+      };
+      this.activeCancelHandle = cancelToken;
       this.state = {
         ...this.state,
         status: 'downloading',
         error: null,
       };
       this.emitState();
-      await this.updater.downloadUpdate();
+      await this.updater.downloadUpdate(cancelToken);
+      if (cancelled) {
+        this.state = {
+          ...this.state,
+          status: 'cancelled',
+          progress: null,
+          error: 'Unduhan dibatalkan oleh pengguna.',
+        };
+        this.emitState();
+      }
     } catch (err) {
+      if (this.state.status === 'cancelled') {
+        return this.getState();
+      }
       this.state = {
         ...this.state,
         status: 'error',
         error: err instanceof Error ? err.message : String(err),
       };
       this.emitState();
+    } finally {
+      this.activeCancelHandle = null;
     }
     return this.getState();
+  }
+
+  public cancelDownload(): UpdateState {
+    if (this.activeCancelHandle) {
+      this.activeCancelHandle.cancel();
+      this.activeCancelHandle = null;
+    }
+    if (this.state.status === 'downloading') {
+      this.state = {
+        ...this.state,
+        status: 'cancelled',
+        progress: null,
+        error: 'Unduhan dibatalkan oleh pengguna.',
+      };
+      this.emitState();
+    }
+    return this.getState();
+  }
+
+  public async retryDownload(): Promise<UpdateState> {
+    if (this.state.status === 'error' || this.state.status === 'cancelled') {
+      this.state = {
+        ...this.state,
+        status: this.state.updateAvailable ? 'available' : 'idle',
+        error: null,
+        progress: null,
+      };
+      this.emitState();
+    }
+    return this.downloadUpdate();
   }
 
   public backupDatabase(): string | null {

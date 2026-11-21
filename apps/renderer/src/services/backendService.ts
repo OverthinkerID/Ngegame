@@ -1101,6 +1101,41 @@ export const backendService = {
     return this.getUpdaterState();
   },
 
+  async cancelUpdateDownload(): Promise<import('@ngegame/shared').UpdateState> {
+    if (window.ngegameAPI?.cancelUpdateDownload) {
+      return window.ngegameAPI.cancelUpdateDownload();
+    }
+    return this.getUpdaterState();
+  },
+
+  async retryUpdateDownload(): Promise<import('@ngegame/shared').UpdateState> {
+    if (window.ngegameAPI?.retryUpdateDownload) {
+      return window.ngegameAPI.retryUpdateDownload();
+    }
+    return this.getUpdaterState();
+  },
+
+  async getUpdateHistory(limit = 15): Promise<import('@ngegame/shared').UpdateHistoryEntry[]> {
+    const data = await requestJson<{ history?: import('@ngegame/shared').UpdateHistoryEntry[] }>(
+      `/api/updates/history?limit=${limit}`,
+    ).catch(() => ({ history: [] }));
+    return data.history ?? [];
+  },
+
+  async getUpdateCompatibility(): Promise<import('@ngegame/shared').RuntimeCompatibilityReport | null> {
+    const data = await requestJson<{
+      compatibility?: import('@ngegame/shared').RuntimeCompatibilityReport;
+    }>('/api/updates/compatibility').catch(() => ({ compatibility: undefined }));
+    return data.compatibility ?? null;
+  },
+
+  async getUpdateRecoveryLogs(limit = 10): Promise<import('@ngegame/shared').UpdateRecoveryLogEntry[]> {
+    const data = await requestJson<{ logs?: import('@ngegame/shared').UpdateRecoveryLogEntry[] }>(
+      `/api/updates/recovery?limit=${limit}`,
+    ).catch(() => ({ logs: [] }));
+    return data.logs ?? [];
+  },
+
   async installUpdate(
     options?: import('@ngegame/shared').UpdateInstallOptions,
   ): Promise<import('@ngegame/shared').UpdateState> {

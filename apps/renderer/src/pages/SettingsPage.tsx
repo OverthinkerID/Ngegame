@@ -1,6 +1,14 @@
-import { Database, Download, History, Info, Moon, Palette, RefreshCw, RotateCcw, Shield, Sun } from 'lucide-react';
+import { Database, Download, History, Info, Moon, Palette, RefreshCw, RotateCcw, Shield, Sun, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { AppInfo, SystemLogEntry, UpdateCheckFrequency, UpdateState } from '@ngegame/shared';
+import type {
+  AppInfo,
+  RuntimeCompatibilityReport,
+  SystemLogEntry,
+  UpdateCheckFrequency,
+  UpdateHistoryEntry,
+  UpdateRecoveryLogEntry,
+  UpdateState,
+} from '@ngegame/shared';
 import { AppSelect } from '../components/ui/AppSelect.js';
 import { ObsLogo, SteamLogo, TwitchLogo, YouTubeLogo } from '../components/ui/BrandIcons.js';
 import { ConfirmDialog } from '../components/ui/FeedbackComponents.js';
@@ -41,6 +49,9 @@ export function SettingsPage({
   const { mode, setMode, accent, setAccent } = useTheme();
   const [tab, setTab] = useState<SettingsTab>(initialTab);
   const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+  const [updateHistory, setUpdateHistory] = useState<UpdateHistoryEntry[]>([]);
+  const [compatReport, setCompatReport] = useState<RuntimeCompatibilityReport | null>(null);
+  const [recoveryLogs, setRecoveryLogs] = useState<UpdateRecoveryLogEntry[]>([]);
   const [confirmInstallOpen, setConfirmInstallOpen] = useState(false);
   const [busyUpdate, setBusyUpdate] = useState(false);
 
@@ -50,6 +61,9 @@ export function SettingsPage({
 
   useEffect(() => {
     void backendService.getUpdaterState().then(setUpdateState).catch(() => undefined);
+    void backendService.getUpdateHistory(10).then(setUpdateHistory).catch(() => undefined);
+    void backendService.getUpdateCompatibility().then(setCompatReport).catch(() => undefined);
+    void backendService.getUpdateRecoveryLogs(10).then(setRecoveryLogs).catch(() => undefined);
     return backendService.onUpdaterStateChanged((st) => setUpdateState(st));
   }, []);
 
@@ -72,6 +86,26 @@ export function SettingsPage({
     setBusyUpdate(true);
     try {
       const st = await backendService.downloadUpdate();
+      setUpdateState(st);
+    } finally {
+      setBusyUpdate(false);
+    }
+  };
+
+  const handleCancelDownload = async (): Promise<void> => {
+    setBusyUpdate(true);
+    try {
+      const st = await backendService.cancelUpdateDownload();
+      setUpdateState(st);
+    } finally {
+      setBusyUpdate(false);
+    }
+  };
+
+  const handleRetryDownload = async (): Promise<void> => {
+    setBusyUpdate(true);
+    try {
+      const st = await backendService.retryUpdateDownload();
       setUpdateState(st);
     } finally {
       setBusyUpdate(false);
@@ -256,13 +290,15 @@ export function SettingsPage({
               meta={
                 updateState?.progress?.bytesPerSecond
                   ? `${Math.round(updateState.progress.bytesPerSecond / 1024)} KB/s`
-                  : 'Siaga'
+                  : updateState?.packageSizeBytes
+                    ? `Ukuran: ${(updateState.packageSizeBytes / (1024 * 1024)).toFixed(1)} MB`
+                    : 'Siaga'
               }
             />
             <StatCard
-              label="Terakhir Dicek"
+              label="Saluran &amp; Terakhir Dicek"
               value={updateState?.lastCheckedAt ? new Date(updateState.lastCheckedAt).toLocaleTimeString('id-ID') : 'Belum pernah'}
-              meta={updateState?.lastBackupPath ? 'Backup SQLite siap' : 'Backup otomatis sebelum install'}
+              meta={`Saluran: ${updateState?.preferences.allowPrerelease ? 'Beta' : 'Stable'} • ${updateState?.lastBackupPath ? 'Backup siap' : 'Backup otomatis'}`}
             />
           </section>
 
@@ -281,12 +317,31 @@ export function SettingsPage({
                 </button>
                 <button
                   type="button"
-                  disabled={busyUpdate || !updateState?.updateAvailable || updateState?.status === 'downloaded'}
+                  disabled={busyUpdate || !updateState?.updateAvailable || updateState?.status === 'downloaded' || updateState?.status === 'downloading'}
                   onClick={() => void handleDownloadUpdate()}
                   className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-xs text-[var(--text-primary)] disabled:opacity-40"
                 >
                   <Download className="h-3.5 w-3.5" /> Download Update
                 </button>
+                {updateState?.status === 'downloading' && (
+                  <button
+                    type="button"
+                    onClick={() => void handleCancelDownload()}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 text-xs font-semibold text-rose-400"
+                  >
+                    <XCircle className="h-3.5 w-3.5" /> Batalkan Unduhan
+                  </button>
+                )}
+                {(updateState?.status === 'error' || updateState?.status === 'cancelled') && updateState?.updateAvailable && (
+                  <button
+                    type="button"
+                    disabled={busyUpdate}
+                    onClick={() => void handleRetryDownload()}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 text-xs font-semibold text-amber-400"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Coba Lagi
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={busyUpdate || updateState?.status !== 'downloaded'}
@@ -395,6 +450,52 @@ export function SettingsPage({
                   ]}
                   className="w-36"
                 />
+              </div>
+            </div>
+          </Panel>
+
+          <Panel
+            title="Kompatibilitas Runtime, Riwayat &amp; Pemulihan"
+            subtitle="Pemeriksaan kesehatan Prisma SQLite & Python Worker serta log pemulihan pasca-pembaruan."
+          >
+            <div className="grid grid-cols-1 gap-4 text-xs lg:grid-cols-2">
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-[var(--text-primary)]">Kompatibilitas Runtime</span>
+                  <StatusBadge
+                    variant={compatReport?.ok ? 'healthy' : 'warning'}
+                    label={compatReport ? (compatReport.ok ? 'Siap Update' : 'Perlu Perhatian') : 'Memeriksa'}
+                  />
+                </div>
+                <div className="mt-2 space-y-1 text-[11px] text-[var(--text-secondary)]">
+                  <div>Database SQLite: {compatReport?.databaseReadable ? 'Terhubung' : 'Belum terverifikasi'}</div>
+                  <div>Skema Prisma: {compatReport?.prismaSchemaValid ? 'Sinkron' : 'Periksa migrasi'}</div>
+                  <div>Python Worker: {compatReport?.pythonWorkerAvailable ? compatReport.pythonVersion ?? 'Siap' : 'Tidak aktif'}</div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4">
+                <div className="font-semibold text-[var(--text-primary)]">Riwayat Pembaruan &amp; Pemulihan</div>
+                <div className="mt-2 space-y-1.5 text-[11px] text-[var(--text-secondary)]">
+                  {updateHistory.length === 0 && recoveryLogs.length === 0 ? (
+                    <div>Belum ada riwayat pembaruan atau log pemulihan tercatat.</div>
+                  ) : (
+                    <>
+                      {updateHistory.slice(0, 3).map((item) => (
+                        <div key={`hist-${item.id}`} className="flex justify-between">
+                          <span>v{item.fromVersion} → v{item.toVersion} ({item.channel})</span>
+                          <span className="font-mono">{item.status}</span>
+                        </div>
+                      ))}
+                      {recoveryLogs.slice(0, 2).map((log) => (
+                        <div key={`rec-${log.id}`} className="flex justify-between text-amber-400">
+                          <span>{log.action}</span>
+                          <span>{log.success ? 'OK' : 'Gagal'}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </Panel>

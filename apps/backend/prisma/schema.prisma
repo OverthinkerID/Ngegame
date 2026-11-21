@@ -280,3 +280,62 @@ model AdaptationProposal {
 
   @@index([gameId, status, createdAt])
 }
+
+model UpdateHistory {
+  id           Int       @id @default(autoincrement())
+  fromVersion  String
+  toVersion    String
+  channel      String    @default("stable")
+  status       String
+  releaseNotes String?
+  releaseDate  String?
+  packageSize  Int       @default(0)
+  backupPath   String?
+  errorMessage String?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  @@index([startedAt])
+  @@index([status])
+}
+
+model UpdatePreferences {
+  id                         Int       @id @default(1)
+  autoCheck                  Boolean   @default(true)
+  autoDownload               Boolean   @default(false)
+  requireInstallConfirmation Boolean   @default(true)
+  checkFrequency             String    @default("startup")
+  allowPrerelease            Boolean   @default(false)
+  channel                    String    @default("stable")
+  lastCheckedAt              DateTime?
+  updatedAt                  DateTime  @updatedAt
+}
+
+model UpdateDownload {
+  id              Int      @id @default(autoincrement())
+  version         String
+  channel         String   @default("stable")
+  status          String
+  totalBytes      Int      @default(0)
+  downloadedBytes Int      @default(0)
+  percent         Float    @default(0)
+  bytesPerSecond  Int      @default(0)
+  errorMessage    String?
+  startedAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([version, status])
+}
+
+model UpdateRecoveryLog {
+  id         Int      @id @default(autoincrement())
+  version    String
+  action     String
+  backupPath String?
+  success    Boolean  @default(true)
+  details    String
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}
+
