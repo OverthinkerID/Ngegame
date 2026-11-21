@@ -908,4 +908,153 @@ export const backendService = {
   async recoverRuntimeSessions() {
     return requestJson('/api/runtime/recover', { method: 'POST' });
   },
+
+  async detectObs(): Promise<import('@ngegame/shared').ObsDetectionResult> {
+    return requestJson('/api/streaming/obs/detect');
+  },
+
+  async reconnectObs(): Promise<StreamingStatusResponse> {
+    return requestJson('/api/streaming/obs/reconnect', { method: 'POST' });
+  },
+
+  async setObsAudioVolume(inputName: string, volumeDb: number): Promise<StreamingStatusResponse> {
+    return requestJson('/api/streaming/audio/volume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inputName, volumeDb }),
+    });
+  },
+
+  async startObsRecording(): Promise<StreamingStatusResponse> {
+    return requestJson('/api/streaming/recording/start', { method: 'POST' });
+  },
+
+  async stopObsRecording(): Promise<StreamingStatusResponse> {
+    return requestJson('/api/streaming/recording/stop', { method: 'POST' });
+  },
+
+  async toggleObsRecordingPause(): Promise<StreamingStatusResponse> {
+    return requestJson('/api/streaming/recording/pause', { method: 'POST' });
+  },
+
+  async emergencyStopStreaming(): Promise<StreamingStatusResponse> {
+    return requestJson('/api/streaming/emergency-stop', { method: 'POST' });
+  },
+
+  async configureYouTubeOAuth(input: {
+    clientId: string;
+    authEndpoint?: string;
+    redirectUri?: string;
+    allowManage?: boolean;
+  }): Promise<import('@ngegame/shared').YouTubeAccountStatus> {
+    return requestJson('/api/streaming/youtube/oauth/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  },
+
+  async getYouTubeOAuthUrl(): Promise<{ url: string; state: string; scopes: string[] }> {
+    return requestJson('/api/streaming/youtube/oauth/url');
+  },
+
+  async refreshYouTube(): Promise<import('@ngegame/shared').YouTubeAccountStatus> {
+    return requestJson('/api/streaming/youtube/refresh', { method: 'POST' });
+  },
+
+  async disconnectYouTube(): Promise<import('@ngegame/shared').YouTubeAccountStatus> {
+    return requestJson('/api/streaming/youtube/disconnect', { method: 'POST' });
+  },
+
+  async configureTwitchOAuth(input: {
+    clientId: string;
+    authEndpoint?: string;
+    redirectUri?: string;
+    allowManage?: boolean;
+  }): Promise<import('@ngegame/shared').TwitchAccountStatus> {
+    return requestJson('/api/streaming/twitch/oauth/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  },
+
+  async getTwitchOAuthUrl(): Promise<{ url: string; state: string; scopes: string[] }> {
+    return requestJson('/api/streaming/twitch/oauth/url');
+  },
+
+  async refreshTwitch(): Promise<import('@ngegame/shared').TwitchAccountStatus> {
+    return requestJson('/api/streaming/twitch/refresh', { method: 'POST' });
+  },
+
+  async disconnectTwitch(): Promise<import('@ngegame/shared').TwitchAccountStatus> {
+    return requestJson('/api/streaming/twitch/disconnect', { method: 'POST' });
+  },
+
+  async updateStreamNarrationConfig(
+    partial: Partial<import('@ngegame/shared').NarrationConfig>,
+  ): Promise<import('@ngegame/shared').NarrationStatusResponse> {
+    return requestJson('/api/streaming/narration/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(partial),
+    });
+  },
+
+  async enqueueStreamNarration(input: {
+    text: string;
+    emotion?: import('@ngegame/shared').VoiceEmotion;
+    urgent?: boolean;
+  }): Promise<import('@ngegame/shared').NarrationStatusResponse> {
+    return requestJson('/api/streaming/narration/enqueue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  },
+
+  async triggerAutoStreamNarration(): Promise<import('@ngegame/shared').NarrationStatusResponse> {
+    return requestJson('/api/streaming/narration/auto', { method: 'POST' });
+  },
+
+  async interruptStreamNarration(): Promise<import('@ngegame/shared').NarrationStatusResponse> {
+    return requestJson('/api/streaming/narration/interrupt', { method: 'POST' });
+  },
+
+  async analyzeStreamAssistant(): Promise<import('@ngegame/shared').StreamAssistantStatusResponse> {
+    return requestJson('/api/streaming/assistant/analyze', { method: 'POST' });
+  },
+
+  async sendStreamAssistantCommand(
+    command: string,
+  ): Promise<{ reply: string; status: import('@ngegame/shared').StreamAssistantStatusResponse }> {
+    return requestJson('/api/streaming/assistant/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command }),
+    });
+  },
+
+  async approveStreamSuggestion(
+    id: string,
+  ): Promise<import('@ngegame/shared').StreamAssistantStatusResponse> {
+    return requestJson(`/api/streaming/assistant/suggestions/${encodeURIComponent(id)}/approve`, {
+      method: 'POST',
+    });
+  },
+
+  async rejectStreamSuggestion(
+    id: string,
+  ): Promise<import('@ngegame/shared').StreamAssistantStatusResponse> {
+    return requestJson(`/api/streaming/assistant/suggestions/${encodeURIComponent(id)}/reject`, {
+      method: 'POST',
+    });
+  },
+
+  async getStreamingAnalytics(): Promise<{
+    samples: import('@ngegame/shared').StreamAnalyticsSampleItem[];
+    sessions: import('@ngegame/shared').StreamSessionHistoryItem[];
+  }> {
+    return requestJson('/api/streaming/analytics');
+  },
 };
