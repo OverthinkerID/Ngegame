@@ -939,6 +939,18 @@ export function GameAdaptationStudioPage({
             >
               <span>Release All Keys</span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                void backendService.resumeController().then(() => {
+                  onNotify?.('Controller diaktifkan (resume).', 'success');
+                });
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-300"
+            >
+              <Play className="h-3.5 w-3.5" />
+              <span>Aktifkan Controller</span>
+            </button>
           </div>
           {controlTestResult && (
             <div className="mt-2 rounded-lg bg-[var(--bg-secondary)] p-2.5 font-mono text-[11px] text-[var(--text-secondary)]">

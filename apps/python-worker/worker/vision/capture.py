@@ -10,8 +10,8 @@ def _find_macos_window_id(window_title: str) -> Optional[int]:
     target = window_title.strip().lower()
     if not target or target == "primary display":
         return None
-    # Strip "Owner: Title" format if passed from UI dropdown
-    tokens = [t.strip() for t in target.split(":") if t.strip()]
+    # Strip "Owner: Title" or "Owner — Title" format if passed from UI dropdown
+    tokens = [t.strip() for t in target.replace("—", ":").split(":") if t.strip()]
     if not tokens:
         return None
 
@@ -47,7 +47,7 @@ def _find_macos_window_id(window_title: str) -> Optional[int]:
     # Fallback: compile native Swift CoreGraphics helper once into temp dir
     try:
         swift_src = os.path.join(os.path.dirname(__file__), "macos_window_id.swift")
-        bin_path = os.path.join(tempfile.gettempdir(), "ngegame_macos_winid_v1")
+        bin_path = os.path.join(tempfile.gettempdir(), "ngegame_macos_winid_v2")
         if os.path.isfile(swift_src) and not os.path.isfile(bin_path):
             subprocess.run(
                 ["swiftc", "-O", swift_src, "-o", bin_path],

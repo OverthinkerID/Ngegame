@@ -2,7 +2,8 @@ import Foundation
 import CoreGraphics
 
 let query = CommandLine.arguments.dropFirst().joined(separator: " ").lowercased()
-let tokens = query
+let normalized = query.replacingOccurrences(of: "—", with: ":")
+let tokens = normalized
     .split(separator: ":")
     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
     .filter { !$0.isEmpty }

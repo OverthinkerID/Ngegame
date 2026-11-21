@@ -167,7 +167,7 @@ export class VoiceStudioService {
     const res = await fetch(`${this.settings.voxcpmBaseUrl}/api/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(90000),
       body: JSON.stringify({
         text,
         language: 'id',
