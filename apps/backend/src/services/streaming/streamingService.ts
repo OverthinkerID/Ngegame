@@ -3,17 +3,25 @@ import {
   ErrorCode,
   type MultistreamTarget,
   type ObsAudioInput,
+  type ObsDetectionResult,
   type ObsSceneItem,
   type ObsSourceItem,
   type SaveStreamCredentialRequest,
+  type StreamAnalyticsSampleItem,
   type StreamHealthMetrics,
   type StreamingStatusResponse,
   type StreamPlatform,
+  type StreamSessionHistoryItem,
+  type TwitchAccountStatus,
+  type YouTubeAccountStatus,
 } from '@ngegame/shared';
 import { getPrismaClient, recordSystemLog } from '../../db/prisma.js';
 import { Logger } from '../../utils/logger.js';
 import { maskSecret, StreamCredentialStore } from './credentialStore.js';
 import { ObsWebSocketClient } from './obsWebSocketClient.js';
+import { Phase15StreamingHub } from './phase15StreamingHub.js';
+import { StreamAssistantService } from './streamAssistantService.js';
+import { StreamNarrationService } from './streamNarrationService.js';
 
 interface TargetConfigState {
   enabled: boolean;
@@ -27,11 +35,18 @@ export class StreamingService {
   private readonly logger: Logger;
   private readonly obsClient = new ObsWebSocketClient();
   private readonly credentialStore = new StreamCredentialStore();
+  public readonly narrationService: StreamNarrationService;
+  public readonly assistantService: StreamAssistantService;
+  private readonly hub: Phase15StreamingHub;
 
   private obsUrl = process.env.OBS_WS_URL ?? 'ws://localhost:4455';
+  private obsCredStored = false;
   private lastError: string | null = null;
   private previewImageBase64: string | null = null;
   private activeSessionId: number | null = null;
+  private prevOutputBytes = 0;
+  private prevSampleTimeMs = 0;
+  private lastBitrateKbps = 0;
 
   private targets: Record<StreamPlatform, TargetConfigState> = {
     youtube: {
@@ -52,18 +67,40 @@ export class StreamingService {
 
   constructor(logger = new Logger('streaming-service')) {
     this.logger = logger;
+    this.narrationService = new StreamNarrationService(this.obsClient);
+    this.assistantService = new StreamAssistantService(this.obsClient, this.narrationService);
+    this.hub = new Phase15StreamingHub(this.obsClient, this.credentialStore, this.narrationService);
+  }
+
+  public async detectObs(): Promise<ObsDetectionResult> {
+    return this.hub.detectObs(this.obsUrl);
   }
 
   public async connectObs(url: string, password?: string): Promise<StreamingStatusResponse> {
     this.obsUrl = url.trim() || this.obsUrl;
+    if (password && password.trim()) {
+      await this.credentialStore.saveSecret('obs-ws-cred', password.trim());
+      this.obsCredStored = true;
+    }
+    const secret =
+      password?.trim() || (await this.credentialStore.getSecret('obs-ws-cred')) || undefined;
     try {
-      await this.obsClient.connect(this.obsUrl, password);
+      await this.obsClient.connect(this.obsUrl, secret);
       this.lastError = null;
       await recordSystemLog('info', 'streaming', `Connected to OBS WebSocket (${this.obsUrl})`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.lastError = `OBS tidak terjangkau di ${this.obsUrl}: ${msg}`;
+      this.lastError = `OBS tidak terjangkau di ${this.obsUrl}: ${this.hub.formatError(err)}`;
       this.logger.warn(this.lastError);
+    }
+    return this.getStatus();
+  }
+
+  public async reconnectObs(): Promise<StreamingStatusResponse> {
+    try {
+      await this.obsClient.reconnect();
+      this.lastError = null;
+    } catch (err) {
+      this.lastError = this.hub.formatError(err);
     }
     return this.getStatus();
   }
@@ -102,7 +139,6 @@ export class StreamingService {
       target.enabled = req.enabled;
     }
 
-    // Never log plaintext stream key!
     await recordSystemLog(
       'info',
       'streaming',
@@ -151,6 +187,32 @@ export class StreamingService {
     return this.getStatus();
   }
 
+  public async setAudioVolume(
+    inputName: string,
+    volumeDb: number,
+  ): Promise<StreamingStatusResponse> {
+    await this.obsClient.request('SetInputVolume', {
+      inputName,
+      inputVolumeDb: Math.max(-60, Math.min(0, volumeDb)),
+    });
+    return this.getStatus();
+  }
+
+  public async startRecording(): Promise<StreamingStatusResponse> {
+    await this.obsClient.request('StartRecord');
+    return this.getStatus();
+  }
+
+  public async stopRecording(): Promise<StreamingStatusResponse> {
+    await this.obsClient.request('StopRecord');
+    return this.getStatus();
+  }
+
+  public async toggleRecordingPause(): Promise<StreamingStatusResponse> {
+    await this.obsClient.request('ToggleRecordPause');
+    return this.getStatus();
+  }
+
   public async capturePreview(): Promise<StreamingStatusResponse> {
     const status = await this.getStatus();
     if (this.obsClient.isConnected() && status.currentScene) {
@@ -170,7 +232,11 @@ export class StreamingService {
     return this.getStatus();
   }
 
-  public async startStreaming(): Promise<StreamingStatusResponse> {
+  public async startStreaming(options?: {
+    confirmedPublic?: boolean;
+    title?: string;
+  }): Promise<StreamingStatusResponse> {
+    this.hub.clearEmergencyStop();
     const enabledPlatforms = (Object.keys(this.targets) as StreamPlatform[]).filter(
       (p) => this.targets[p].enabled,
     );
@@ -178,6 +244,17 @@ export class StreamingService {
     if (enabledPlatforms.length === 0) {
       throw new AppError(
         'Aktifkan minimal satu target stream (YouTube atau Twitch)',
+        ErrorCode.VALIDATION_ERROR,
+        400,
+      );
+    }
+
+    if (
+      enabledPlatforms.some((p) => this.targets[p].visibilityMode === 'public') &&
+      !options?.confirmedPublic
+    ) {
+      throw new AppError(
+        'Siaran publik memerlukan konfirmasi eksplisit pengguna sebelum mengudara.',
         ErrorCode.VALIDATION_ERROR,
         400,
       );
@@ -200,7 +277,6 @@ export class StreamingService {
       );
     }
 
-    // Configure primary stream service in OBS from Credential Manager (never persisted to SQLite)
     const primaryPlatform = enabledPlatforms[0] ?? 'youtube';
     const primaryKey = await this.credentialStore.getSecret(`stream-key-${primaryPlatform}`);
     if (primaryKey) {
@@ -220,6 +296,7 @@ export class StreamingService {
       data: {
         platforms: enabledPlatforms.join(','),
         visibility: this.targets[primaryPlatform].visibilityMode,
+        title: options?.title?.trim() || 'Sesi Siaran Overthinker',
         status: 'streaming',
       },
     });
@@ -234,6 +311,7 @@ export class StreamingService {
   }
 
   public async stopStreaming(): Promise<StreamingStatusResponse> {
+    const before = await this.getStatus();
     if (this.obsClient.isConnected()) {
       try {
         await this.obsClient.request('StopStream');
@@ -246,13 +324,84 @@ export class StreamingService {
       const prisma = getPrismaClient();
       await prisma.streamSessionLog.update({
         where: { id: this.activeSessionId },
-        data: { status: 'ended', endedAt: new Date() },
+        data: {
+          status: 'ended',
+          endedAt: new Date(),
+          avgBitrate: before.health.bitrateKbps,
+          avgFps: before.health.fps,
+          droppedFrames: before.health.droppedFrames,
+          durationSeconds: before.health.durationSeconds,
+          narrationCount: this.narrationService.getNarrationCount(),
+        },
       });
       this.activeSessionId = null;
     }
 
     await recordSystemLog('info', 'streaming', 'Streaming stopped');
     return this.getStatus();
+  }
+
+  public async emergencyStop(): Promise<StreamingStatusResponse> {
+    await this.hub.emergencyStop(this.activeSessionId);
+    this.activeSessionId = null;
+    return this.getStatus();
+  }
+
+  public async configureYouTubeOAuth(input: {
+    clientId: string;
+    authEndpoint?: string;
+    redirectUri?: string;
+    allowManage?: boolean;
+  }): Promise<YouTubeAccountStatus> {
+    return this.hub.configureYouTube(input);
+  }
+
+  public async getYouTubeAuthUrl(): Promise<{ url: string; state: string; scopes: string[] }> {
+    return this.hub.getYouTubeAuthUrl();
+  }
+
+  public async handleYouTubeCallback(code: string, state?: string): Promise<YouTubeAccountStatus> {
+    return this.hub.handleYouTubeCallback(code, state);
+  }
+
+  public async syncYouTube(): Promise<YouTubeAccountStatus> {
+    return this.hub.syncYouTube();
+  }
+
+  public async disconnectYouTube(): Promise<YouTubeAccountStatus> {
+    return this.hub.disconnectYouTube();
+  }
+
+  public async configureTwitchOAuth(input: {
+    clientId: string;
+    authEndpoint?: string;
+    redirectUri?: string;
+    allowManage?: boolean;
+  }): Promise<TwitchAccountStatus> {
+    return this.hub.configureTwitch(input);
+  }
+
+  public async getTwitchAuthUrl(): Promise<{ url: string; state: string; scopes: string[] }> {
+    return this.hub.getTwitchAuthUrl();
+  }
+
+  public async handleTwitchCallback(code: string, state?: string): Promise<TwitchAccountStatus> {
+    return this.hub.handleTwitchCallback(code, state);
+  }
+
+  public async syncTwitch(): Promise<TwitchAccountStatus> {
+    return this.hub.syncTwitch();
+  }
+
+  public async disconnectTwitch(): Promise<TwitchAccountStatus> {
+    return this.hub.disconnectTwitch();
+  }
+
+  public async getAnalyticsAndHistory(): Promise<{
+    samples: StreamAnalyticsSampleItem[];
+    sessions: StreamSessionHistoryItem[];
+  }> {
+    return this.hub.getAnalyticsAndHistory();
   }
 
   public async getStatus(): Promise<StreamingStatusResponse> {
@@ -296,41 +445,78 @@ export class StreamingService {
               sceneItemId?: number;
               sourceName?: string;
               sceneItemEnabled?: boolean;
+              inputKind?: string;
             };
             return {
               sceneItemId: Number(rec.sceneItemId ?? 0),
               sourceName: String(rec.sourceName ?? ''),
               visible: Boolean(rec.sceneItemEnabled ?? true),
+              inputKind: rec.inputKind,
             };
           });
         }
 
         const inputsRes = await this.obsClient.request('GetInputList');
         const rawInputs = Array.isArray(inputsRes.inputs) ? inputsRes.inputs : [];
-        audioInputs = rawInputs.slice(0, 6).map((inp) => ({
-          inputName: String((inp as { inputName?: string }).inputName ?? ''),
-          muted: false,
-          volumeDb: 0,
-        }));
+        audioInputs = await Promise.all(
+          rawInputs.slice(0, 8).map(async (inp) => {
+            const inputName = String((inp as { inputName?: string }).inputName ?? '');
+            const inputKind = String((inp as { inputKind?: string }).inputKind ?? '');
+            let muted = false;
+            let volumeDb = 0;
+            let volumeMul = 1;
+            try {
+              const m = await this.obsClient.request('GetInputMute', { inputName });
+              muted = Boolean(m.inputMuted);
+              const v = await this.obsClient.request('GetInputVolume', { inputName });
+              volumeDb = Number(v.inputVolumeDb ?? 0);
+              volumeMul = Number(v.inputVolumeMul ?? 1);
+            } catch {
+              // non-audio input
+            }
+            return { inputName, inputKind, muted, volumeDb, volumeMul };
+          }),
+        );
 
         const streamStatus = await this.obsClient.request('GetStreamStatus');
         const stats = await this.obsClient.request('GetStats');
         const totalFrames = Number(streamStatus.outputTotalFrames ?? 0);
         const droppedFrames = Number(streamStatus.outputSkippedFrames ?? 0);
+        const outputBytes = Number(streamStatus.outputBytes ?? 0);
+        const nowMs = Date.now();
+        if (this.prevSampleTimeMs > 0 && outputBytes > this.prevOutputBytes) {
+          const dtSec = Math.max(0.25, (nowMs - this.prevSampleTimeMs) / 1000);
+          this.lastBitrateKbps = Math.round(((outputBytes - this.prevOutputBytes) * 8) / (dtSec * 1000));
+        }
+        this.prevOutputBytes = outputBytes;
+        this.prevSampleTimeMs = nowMs;
+
         health.streaming = Boolean(streamStatus.outputActive);
         health.reconnecting = Boolean(streamStatus.outputReconnecting);
         health.durationSeconds = Math.round(Number(streamStatus.outputDuration ?? 0) / 1000);
+        health.bitrateKbps = health.streaming ? this.lastBitrateKbps : 0;
         health.droppedFrames = droppedFrames;
         health.totalFrames = totalFrames;
         health.droppedPercent =
           totalFrames > 0 ? Number(((droppedFrames / totalFrames) * 100).toFixed(2)) : 0;
         health.congestion = Number(streamStatus.outputCongestion ?? 0);
         health.fps = Math.round(Number(stats.activeFps ?? 0));
+
+        if (health.streaming) {
+          await this.hub.recordSample({
+            sessionId: this.activeSessionId,
+            bitrateKbps: health.bitrateKbps,
+            fps: health.fps,
+            droppedFrames: health.droppedFrames,
+            audioLevelDb: audioInputs[0]?.volumeDb ?? -12,
+          });
+        }
       } catch (err) {
-        this.lastError = err instanceof Error ? err.message : String(err);
+        this.lastError = this.hub.formatError(err);
       }
     }
 
+    const recording = await this.hub.getRecordingStatus();
     const targets: MultistreamTarget[] = (['youtube', 'twitch'] as StreamPlatform[]).map(
       (platform) => {
         const cfg = this.targets[platform];
@@ -341,24 +527,47 @@ export class StreamingService {
           hasStreamKey: cfg.hasStreamKey,
           maskedKey: cfg.maskedKey,
           visibilityMode: cfg.visibilityMode,
-          status: health.streaming && cfg.enabled
-            ? 'streaming'
-            : cfg.hasStreamKey
-              ? 'ready'
-              : 'unconfigured',
+          bandwidthKbps: health.streaming && cfg.enabled ? health.bitrateKbps : 0,
+          status:
+            health.streaming && cfg.enabled
+              ? 'streaming'
+              : cfg.hasStreamKey
+                ? 'ready'
+                : 'unconfigured',
         };
       },
     );
+    const yt = this.hub.getYouTubeStatus();
+    const tw = this.hub.getTwitchStatus();
 
     return {
       obsConnected,
+      obsReconnecting: this.obsClient.isReconnecting(),
+      obsVersion: this.obsClient.getObsVersion(),
       obsUrl: this.obsUrl,
+      obsDetection: this.hub.getLastDetection(),
       currentScene,
       scenes,
       sources,
       audioInputs,
+      recording,
       health,
       targets,
+      youtube: yt,
+      twitch: tw,
+      narration: this.narrationService.getStatus(),
+      assistant: this.assistantService.getStatus(),
+      vault: {
+        vaultBackend: this.credentialStore.getVaultBackend(),
+        obsPasswordStored: this.obsCredStored,
+        youtubeOAuthConfigured: yt.configured,
+        youtubeOAuthConnected: yt.connected,
+        twitchOAuthConfigured: tw.configured,
+        twitchOAuthConnected: tw.connected,
+        youtubeStreamKeyMasked: this.targets.youtube.maskedKey,
+        twitchStreamKeyMasked: this.targets.twitch.maskedKey,
+        emergencyStopActive: this.hub.isEmergencyStopActive(),
+      },
       previewImageBase64: this.previewImageBase64,
       lastError: this.lastError,
     };
