@@ -32,6 +32,11 @@ VOXCPM_CMD = os.environ.get("VOXCPM_CMD", "").strip()
 
 
 import sys
+import threading
+
+_MODEL_LOCK = threading.Lock()
+_CACHED_VOXCPM_MODEL: Any = None
+_CACHED_VOXCPM_ID: Optional[str] = None
 
 
 def _has_voxcpm_package() -> bool:
@@ -42,6 +47,19 @@ def _has_f5tts_package() -> bool:
     return importlib.util.find_spec("f5_tts") is not None
 
 
+def _get_voxcpm_model() -> Any:
+    global _CACHED_VOXCPM_MODEL, _CACHED_VOXCPM_ID
+    model_id = os.environ.get("VOXCPM_MODEL_ID", "openbmb/VoxCPM-0.5B")
+    with _MODEL_LOCK:
+        if _CACHED_VOXCPM_MODEL is None or _CACHED_VOXCPM_ID != model_id:
+            print(f"[voxcpm-bridge] Memuat model VoxCPM ({model_id})... (unduhan pertama kali mungkin butuh beberapa menit)", flush=True)
+            from voxcpm import VoxCPM  # type: ignore[import-not-found]
+            _CACHED_VOXCPM_MODEL = VoxCPM.from_pretrained(model_id)
+            _CACHED_VOXCPM_ID = model_id
+            print(f"[voxcpm-bridge] Model VoxCPM ({model_id}) siap di memori.", flush=True)
+        return _CACHED_VOXCPM_MODEL
+
+
 def _synthesize_wav(
     text: str,
     speed: float,
@@ -49,7 +67,21 @@ def _synthesize_wav(
     out_wav: str,
 ) -> str:
     effective_cmd = VOXCPM_CMD
-    if not effective_cmd and (_has_voxcpm_package() or _has_f5tts_package()):
+    if not effective_cmd and _has_voxcpm_package() and os.environ.get("VOXCPM_BACKEND", "auto") != "f5-tts":
+        import soundfile as sf  # type: ignore[import-not-found]
+        model = _get_voxcpm_model()
+        wav = model.generate(
+            text=text,
+            prompt_wav_path=ref_path if ref_path else None,
+            prompt_text=None,
+        )
+        sample_rate = getattr(getattr(model, "tts_model", None), "sample_rate", 16000)
+        sf.write(out_wav, wav, int(sample_rate))
+        if not os.path.isfile(out_wav) or os.path.getsize(out_wav) == 0:
+            raise RuntimeError("Voice cloning selesai tetapi file output.wav kosong/tidak dibuat")
+        return "voxcpm-inprocess"
+
+    if not effective_cmd and _has_f5tts_package():
         infer_script = os.path.join(os.path.dirname(__file__), "infer_voice_clone.py")
         if os.path.isfile(infer_script):
             effective_cmd = f"{shlex.quote(sys.executable)} {shlex.quote(infer_script)}"
@@ -58,7 +90,7 @@ def _synthesize_wav(
         cmd = shlex.split(effective_cmd) + ["--text", text, "--out", out_wav]
         if ref_path:
             cmd.extend(["--ref", ref_path])
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180, check=False)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False)
         if proc.returncode != 0:
             err_detail = (proc.stderr or proc.stdout or f"exit code {proc.returncode}").strip()
             print(f"[voxcpm-bridge] Voice cloning command failed: {err_detail}", flush=True)
