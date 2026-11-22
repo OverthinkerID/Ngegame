@@ -88,7 +88,24 @@ export class ControlAdaptationEngine {
       profile.safetyConfiguration.maxHoldDurationMs,
     );
 
-    const mappedKey = binding?.keyboard?.split('/')[0];
+    const dirMap: Record<string, string> = {
+      up: 'w',
+      forward: 'w',
+      down: 's',
+      back: 's',
+      left: 'a',
+      right: 'd',
+    };
+    const requestedRaw =
+      typeof options?.extraParameters?.direction === 'string'
+        ? options.extraParameters.direction.toLowerCase().trim()
+        : typeof options?.extraParameters?.key === 'string'
+          ? options.extraParameters.key.toLowerCase().trim()
+          : '';
+    const mappedKey = requestedRaw
+      ? (dirMap[requestedRaw] ?? requestedRaw)
+      : binding?.keyboard?.split('/')[0];
+
     const result = await controllerService.executeAction({
       actionType,
       target,

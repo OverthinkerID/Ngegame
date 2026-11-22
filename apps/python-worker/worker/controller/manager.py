@@ -5,7 +5,11 @@ from typing import Any, Deque, Dict, Optional
 
 from worker.controller.input_driver import InputDriver, detect_controller_backend
 from worker.controller.keymap import map_action_to_input
-from worker.vision.window_detector import list_visible_windows
+from worker.vision.window_detector import (
+    focus_game_window,
+    get_platform_diagnostics,
+    list_visible_windows,
+)
 
 
 def _utc_now() -> str:
@@ -32,7 +36,14 @@ class ControllerManager:
             "queueLength": len(self.queue),
             "activeWindow": self._get_active_window_summary(),
             "lastActionAt": self.last_action_at,
+            "lastError": self.driver.last_error,
         }
+
+    def get_diagnostics(self, expected_game: Optional[str] = None) -> Dict[str, Any]:
+        diag = get_platform_diagnostics(expected_game=expected_game)
+        diag["controller"] = self.get_status()
+        diag["liveBackend"] = detect_controller_backend(dry_run=False)
+        return diag
 
     @staticmethod
     def _get_active_window_summary() -> Optional[str]:
@@ -87,6 +98,7 @@ class ControllerManager:
             cooldown_ms = 0
 
         dry_run = bool(payload.get("dryRun", True))
+        auto_focus = bool(payload.get("autoFocus", True))
         self.dry_run = dry_run
         expected_game = payload.get("expectedGameTitle")
         active_window = self._get_active_window_summary() or "Unknown Window"
@@ -150,6 +162,12 @@ class ControllerManager:
             }
 
         if not dry_run and isinstance(expected_game, str) and expected_game.strip():
+            if expected_game.lower() not in active_window.lower() and auto_focus:
+                focus_res = focus_game_window(expected_game.strip())
+                if focus_res.get("focused"):
+                    time.sleep(0.12)
+                    active_window = self._get_active_window_summary() or active_window
+
             if expected_game.lower() not in active_window.lower():
                 self.driver.release_all()
                 return {
@@ -160,7 +178,7 @@ class ControllerManager:
                     "dryRun": False,
                     "activeWindow": active_window,
                     "status": "blocked",
-                    "reason": f"Game target '{expected_game}' tidak aktif di jendela depan.",
+                    "reason": f"Game target '{expected_game}' tidak aktif di jendela depan (aktif: '{active_window}').",
                     "executedAt": now_iso,
                 }
 
@@ -176,6 +194,18 @@ class ControllerManager:
                 x = int(raw_x) if isinstance(raw_x, (int, float)) else None
                 y = int(raw_y) if isinstance(raw_y, (int, float)) else None
                 self.driver.execute_mouse_action(token, x, y, dry_run=dry_run)
+        except (PermissionError, RuntimeError) as exc:
+            return {
+                "ok": False,
+                "actionType": action_type,
+                "mappedInput": label,
+                "durationMs": 0,
+                "dryRun": dry_run,
+                "activeWindow": active_window,
+                "status": "blocked",
+                "reason": str(exc),
+                "executedAt": now_iso,
+            }
         finally:
             if self.queue:
                 self.queue.pop()

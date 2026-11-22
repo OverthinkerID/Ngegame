@@ -36,6 +36,9 @@ export interface ActiveSessionSnapshot {
 
 export interface RuntimeOrchestrationState {
   phase: RuntimeLifecyclePhase;
+  loopActive: boolean;
+  loopDryRun: boolean;
+  loopIntervalMs: number;
   activeSession: ActiveSessionSnapshot | null;
   activeGameId: string | null;
   activeGameName: string | null;
@@ -53,6 +56,11 @@ export interface RuntimeOrchestrationState {
 export class RuntimeOrchestratorService {
   private readonly logger: Logger;
   private phase: RuntimeLifecyclePhase = 'idle';
+  private loopActive = false;
+  private loopDryRun = true;
+  private loopIntervalMs = 1200;
+  private loopTimer: ReturnType<typeof setTimeout> | null = null;
+  private stepInFlight = false;
   private activeSessionId: string | null = null;
   private activeGameId: string | null = null;
   private activeGameName: string | null = null;
@@ -86,6 +94,59 @@ export class RuntimeOrchestratorService {
     }
   }
 
+  private clearLoopTimer(): void {
+    if (this.loopTimer !== null) {
+      clearTimeout(this.loopTimer);
+      this.loopTimer = null;
+    }
+  }
+
+  private scheduleNextLoopTick(windowTitle?: string, goalOverride?: string): void {
+    this.clearLoopTimer();
+    if (!this.loopActive) return;
+
+    this.loopTimer = setTimeout(() => {
+      void this.executeLoopTick(windowTitle, goalOverride);
+    }, this.loopIntervalMs);
+  }
+
+  private async executeLoopTick(windowTitle?: string, goalOverride?: string): Promise<void> {
+    if (!this.loopActive) return;
+    if (this.stepInFlight) {
+      this.scheduleNextLoopTick(windowTitle, goalOverride);
+      return;
+    }
+
+    this.stepInFlight = true;
+    try {
+      const supState = await this.supervisionService.getState().catch(() => null);
+      if (supState?.emergencyStopped) {
+        await this.stopLoop('Emergency Stop aktif');
+        return;
+      }
+
+      if (this.phase === 'paused' || supState?.aiPaused) {
+        this.scheduleNextLoopTick(windowTitle, goalOverride);
+        return;
+      }
+
+      await this.runStep({
+        gameId: this.activeGameId ?? undefined,
+        windowTitle,
+        dryRun: this.loopDryRun,
+        goalOverride,
+      });
+    } catch (err) {
+      this.lastError = err instanceof Error ? err.message : String(err);
+      this.logger.warn('Loop tick failed', { error: this.lastError });
+    } finally {
+      this.stepInFlight = false;
+      if (this.loopActive) {
+        this.scheduleNextLoopTick(windowTitle, goalOverride);
+      }
+    }
+  }
+
   public async getState(): Promise<RuntimeOrchestrationState> {
     const prisma = getPrismaClient();
     const [sessionRow, aiProviderHealth, controllerStatus, supervisionState] = await Promise.all([
@@ -101,6 +162,9 @@ export class RuntimeOrchestratorService {
 
     return {
       phase: this.phase,
+      loopActive: this.loopActive,
+      loopDryRun: this.loopDryRun,
+      loopIntervalMs: this.loopIntervalMs,
       activeSession: sessionRow
         ? {
             id: sessionRow.id,
@@ -181,6 +245,52 @@ export class RuntimeOrchestratorService {
     }
   }
 
+  public async startLoop(input: {
+    gameId: string;
+    windowTitle?: string;
+    dryRun?: boolean;
+    intervalMs?: number;
+    goalOverride?: string;
+  }): Promise<RuntimeOrchestrationState> {
+    if (this.activeSessionId === null || this.activeGameId !== input.gameId) {
+      await this.startSession({
+        gameId: input.gameId,
+        windowTitle: input.windowTitle,
+        goal: input.goalOverride,
+      });
+    }
+
+    this.loopActive = true;
+    this.loopDryRun = input.dryRun ?? true;
+    this.loopIntervalMs = Math.min(Math.max(input.intervalMs ?? 1200, 400), 10000);
+    this.phase = 'running';
+    this.lastError = null;
+
+    await recordSystemLog(
+      'info',
+      'runtime',
+      `Continuous AI Loop dimulai (${input.gameId}, dryRun=${this.loopDryRun}, interval=${this.loopIntervalMs}ms)`,
+    );
+
+    // Jalankan tick pertama segera agar responsif, lalu jadwalkan berikutnya
+    void this.executeLoopTick(input.windowTitle, input.goalOverride);
+
+    const state = await this.getState();
+    this.emitWs('runtime:state', state);
+    return state;
+  }
+
+  public async stopLoop(reason = 'Loop dihentikan oleh pengguna'): Promise<RuntimeOrchestrationState> {
+    this.loopActive = false;
+    this.clearLoopTimer();
+    await this.controllerService.releaseAll().catch(() => undefined);
+
+    await recordSystemLog('info', 'runtime', `Continuous AI Loop berhenti: ${reason}`);
+    const state = await this.getState();
+    this.emitWs('runtime:state', state);
+    return state;
+  }
+
   public async runStep(input?: {
     gameId?: string;
     windowTitle?: string;
@@ -227,6 +337,8 @@ export class RuntimeOrchestratorService {
 
   public async stopSession(reason = 'Dihentikan oleh pengguna'): Promise<RuntimeOrchestrationState> {
     this.phase = 'stopping';
+    this.loopActive = false;
+    this.clearLoopTimer();
     await this.supervisionService.stopTask();
 
     const prisma = getPrismaClient();
@@ -262,7 +374,8 @@ export class RuntimeOrchestratorService {
     recoveredCount: number;
     runtime: RuntimeOrchestrationState;
   }> {
-    // Pastikan pemulihan tidak pernah menjalankan ulang aksi berisiko secara otomatis
+    this.loopActive = false;
+    this.clearLoopTimer();
     await this.supervisionService.stopTask();
 
     const prisma = getPrismaClient();

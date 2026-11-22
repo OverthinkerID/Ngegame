@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  Activity,
   Bot,
   Check,
   Cpu,
@@ -13,6 +14,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Square,
   X,
 } from 'lucide-react';
 import type {
@@ -20,6 +22,7 @@ import type {
   AIBrainDecisionResult,
   AIProviderHealth,
   AIProviderType,
+  GameBrainCycleResult,
   GameGenreTemplate,
   SupervisionAuditEntry,
   SupervisionPermissionLevel,
@@ -62,7 +65,14 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
   const [supervision, setSupervision] = useState<SupervisionState | null>(null);
   const [queue, setQueue] = useState<SupervisionQueueItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<SupervisionAuditEntry[]>([]);
-  const [objective, setObjective] = useState('Eksplorasi aman dan cek status HUD');
+  const [objective, setObjective] = useState('Eksplorasi aman dan gerakkan karakter Stardew Valley');
+  const [targetGameId, setTargetGameId] = useState('stardew-valley');
+  const [liveInputMode, setLiveInputMode] = useState(false);
+  const [loopActive, setLoopActive] = useState(false);
+  const [lastCycle, setLastCycle] = useState<GameBrainCycleResult | null>(null);
+  const [diagnostics, setDiagnostics] = useState<Awaited<
+    ReturnType<typeof backendService.getControllerDiagnostics>
+  > | null>(null);
   const [openAIKeyInput, setOpenAIKeyInput] = useState('');
   const [savingKey, setSavingKey] = useState(false);
   const [confirmEmergency, setConfirmEmergency] = useState(false);
@@ -72,19 +82,28 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
   const loadAll = useCallback(async () => {
     setError(null);
     try {
-      const [cfg, health, aiHist, supState, supQueue, supAudit] = await Promise.all([
-        backendService.getAIConfig(),
-        backendService.getAIProvidersHealth(),
-        backendService.getAIHistory(5),
-        backendService.getSupervisionState(),
-        backendService.getSupervisionQueue(15),
-        backendService.getSupervisionAudit(15),
-      ]);
+      const [cfg, health, aiHist, supState, supQueue, supAudit, runtimeState, diag] =
+        await Promise.all([
+          backendService.getAIConfig(),
+          backendService.getAIProvidersHealth(),
+          backendService.getAIHistory(5),
+          backendService.getSupervisionState(),
+          backendService.getSupervisionQueue(15),
+          backendService.getSupervisionAudit(15),
+          backendService.getRuntimeStatus().catch(() => null),
+          backendService.getControllerDiagnostics('Stardew Valley').catch(() => null),
+        ]);
       setConfig(cfg);
       setProviderHealth(health);
       setSupervision(supState);
       setQueue(supQueue);
       setAuditLogs(supAudit);
+      if (runtimeState) {
+        setLoopActive(Boolean(runtimeState.loopActive));
+      }
+      if (diag) {
+        setDiagnostics(diag);
+      }
       if (aiHist.length > 0 && !latestDecision) {
         setLatestDecision(aiHist[0] ?? null);
       }
@@ -105,8 +124,8 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
       const visionHist = await backendService.getVisionHistory(1);
       const latestVision = visionHist[0];
       const result = await backendService.runAIThink({
-        gameTitle: latestVision?.windowTitle ?? 'Simulated Game Session',
-        genre: config?.genre ?? 'Universal',
+        gameTitle: latestVision?.windowTitle ?? 'Stardew Valley',
+        genre: config?.genre ?? 'Simulation',
         objective,
         visionState: latestVision
           ? {
@@ -115,9 +134,10 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
               motionScore: latestVision.motionScore,
               brightness: latestVision.brightness,
               ocrText: latestVision.ocrText,
+              imageBase64: latestVision.imageBase64,
             }
           : {
-              windowTitle: 'Stardew Valley (Simulated)',
+              windowTitle: 'Stardew Valley',
               sceneLabel: 'active_gameplay',
               motionScore: 0.14,
               brightness: 0.56,
@@ -135,7 +155,7 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
           durationMs: firstAction.durationMs,
           confidence: firstAction.confidence,
           rationale: firstAction.rationale,
-          dryRun: true,
+          dryRun: !liveInputMode,
         });
       }
       await loadAll();
@@ -148,6 +168,70 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
     }
   };
 
+  const handleToggleLoop = async (): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (loopActive) {
+        await backendService.stopRuntimeLoop('Dihentikan oleh pengguna dari UI');
+        setLoopActive(false);
+        onNotify?.('AI Gameplay Loop dihentikan.', 'info');
+      } else {
+        await backendService.startRuntimeLoop({
+          gameId: targetGameId,
+          windowTitle: 'Stardew Valley',
+          dryRun: !liveInputMode,
+          intervalMs: 1200,
+          goalOverride: objective,
+        });
+        setLoopActive(true);
+        onNotify?.(
+          liveInputMode
+            ? 'AI Gameplay Loop dimulai dalam mode LIVE INPUT.'
+            : 'AI Gameplay Loop dimulai dalam mode Simulasi (Dry-Run).',
+          'success',
+        );
+      }
+      await loadAll();
+    } catch (err) {
+      const friendly = parseFriendlyError(err, 'Gagal mengubah status AI Gameplay Loop.');
+      setError(friendly.message);
+      onNotify?.(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRunSingleStep = async (): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await backendService.runRuntimeStep({
+        gameId: targetGameId,
+        windowTitle: 'Stardew Valley',
+        dryRun: !liveInputMode,
+        goalOverride: objective,
+      });
+      setLastCycle(res.cycle);
+      onNotify?.(
+        `Siklus selesai: ${res.cycle.plan.chosenAction} (${res.cycle.execution.status})`,
+        res.cycle.execution.executed ? 'success' : 'info',
+      );
+      await loadAll();
+    } catch (err) {
+      const friendly = parseFriendlyError(err, 'Gagal menjalankan 1 siklus gameplay AI.');
+      setError(friendly.message);
+      onNotify?.(friendly.message, 'error', friendly.guideUrl, friendly.guideLabel);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const macosPermsMissing =
+    diagnostics?.macos &&
+    (diagnostics.macos.accessibilityTrusted === false ||
+      diagnostics.macos.screenRecordingGranted === false);
+
   return (
     <div className="space-y-6">
       <div>
@@ -155,7 +239,7 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
           Pusat Kendali AI &amp; Pengawasan Manusia
         </h2>
         <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-          Kelola model AI, tingkat izin L1–L3, antrean persetujuan aksi, pengambilalihan kontrol, dan Emergency Stop.
+          Kelola AI Gameplay Loop, diagnostik izin OS, tingkat izin L1–L3, antrean persetujuan aksi, dan Emergency Stop.
         </p>
       </div>
 
@@ -179,14 +263,14 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
           }
         />
         <StatCard
-          label="Pemegang Kontrol"
-          value={supervision?.controlOwner === 'human' ? 'Manusia' : 'AI Aktif'}
-          meta={supervision?.aiPaused ? 'AI sedang dijeda' : 'AI siap merencanakan aksi'}
-          icon={<Hand className="h-4 w-4" />}
+          label="AI Gameplay Loop"
+          value={loopActive ? 'Berjalan' : 'Berhenti'}
+          meta={liveInputMode ? 'Mode: Live Input OS' : 'Mode: Simulasi Dry-Run'}
+          icon={<Activity className="h-4 w-4" />}
           badge={
             <StatusBadge
-              variant={supervision?.controlOwner === 'human' ? 'warning' : 'healthy'}
-              label={supervision?.controlOwner === 'human' ? 'Takeover' : 'AI'}
+              variant={loopActive ? 'healthy' : 'warning'}
+              label={loopActive ? 'Loop Aktif' : 'Idle'}
             />
           }
         />
@@ -212,19 +296,37 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
         />
       )}
 
-      {(platform === 'darwin' || !platform) && (
+      {(platform === 'darwin' || !platform || macosPermsMissing) && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-xs">
           <div className="flex min-w-0 flex-1 items-start gap-2.5">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
             <div>
               <div className="font-semibold text-[var(--text-primary)]">
-                Izin Sistem macOS Diperlukan untuk Kendali AI &amp; Visi
+                Diagnostik Izin &amp; Jendela Game ({diagnostics?.platform ?? platform ?? 'OS'})
               </div>
               <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
-                Agar fungsi tangkapan layar dan pengiriman input game berjalan sempurna di macOS, aktifkan izin{' '}
-                <strong>Screen Recording</strong>, <strong>Accessibility</strong>, dan{' '}
-                <strong>Input Monitoring</strong> untuk <strong>Ngegame</strong> di{' '}
-                <em>System Settings &rarr; Privacy &amp; Security</em>.
+                {diagnostics?.macos ? (
+                  <>
+                    Accessibility:{' '}
+                    <strong>
+                      {diagnostics.macos.accessibilityTrusted ? 'Diizinkan' : 'BELUM DIIZINKAN'}
+                    </strong>{' '}
+                    • Screen Recording:{' '}
+                    <strong>
+                      {diagnostics.macos.screenRecordingGranted ? 'Diizinkan' : 'BELUM DIIZINKAN'}
+                    </strong>{' '}
+                    • Game Target (Stardew Valley):{' '}
+                    <strong>{diagnostics.gameWindowFound ? 'Terdeteksi' : 'Belum Terbuka'}</strong>
+                  </>
+                ) : diagnostics?.windows ? (
+                  <>
+                    Driver Windows: <strong>{diagnostics.windows.inputMethod}</strong> • Elevated Admin:{' '}
+                    <strong>{diagnostics.windows.isElevatedAdmin ? 'Ya' : 'Tidak'}</strong> • Game
+                    Target: <strong>{diagnostics.gameWindowFound ? 'Terdeteksi' : 'Belum Terbuka'}</strong>
+                  </>
+                ) : (
+                  'Aktifkan izin Screen Recording, Accessibility, dan Input Monitoring di System Settings -> Privacy & Security.'
+                )}
               </p>
             </div>
           </div>
@@ -241,6 +343,90 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
           </button>
         </div>
       )}
+
+      <Panel
+        title="Eksekusi AI Gameplay Loop (Stardew Valley)"
+        subtitle="Jalankan loop Observe → Interpret → Plan → Execute → Verify secara berkelanjutan atau uji 1 siklus."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void handleRunSingleStep()}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
+              Uji 1 Siklus
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void handleToggleLoop()}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                loopActive
+                  ? 'border-rose-500/45 bg-rose-500/15 text-rose-500 hover:bg-rose-500/25'
+                  : 'border-emerald-500/45 bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25'
+              }`}
+            >
+              {loopActive ? (
+                <>
+                  <Square className="h-3.5 w-3.5" /> Stop AI Loop
+                </>
+              ) : (
+                <>
+                  <Play className="h-3.5 w-3.5" /> Start AI Loop
+                </>
+              )}
+            </button>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="space-y-1.5 text-xs">
+            <span className="block text-[var(--text-secondary)]">Profil Game Target</span>
+            <AppSelect
+              value={targetGameId}
+              onChange={(val) => setTargetGameId(val)}
+              options={[
+                { value: 'stardew-valley', label: 'Stardew Valley' },
+                { value: 'generic-simulation', label: 'Generic Simulation' },
+              ]}
+            />
+          </div>
+          <div className="space-y-1.5 text-xs">
+            <span className="block text-[var(--text-secondary)]">Mode Eksekusi Input</span>
+            <button
+              type="button"
+              onClick={() => setLiveInputMode((prev) => !prev)}
+              className={`flex h-9 w-full items-center justify-between rounded-lg border px-3 text-xs font-medium ${
+                liveInputMode
+                  ? 'border-emerald-500/45 bg-emerald-500/15 text-emerald-400'
+                  : 'border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]'
+              }`}
+            >
+              <span>{liveInputMode ? 'LIVE INPUT (Kirim ke Game)' : 'Simulasi Aman (Dry-Run)'}</span>
+              <StatusBadge
+                variant={liveInputMode ? 'healthy' : 'info'}
+                label={liveInputMode ? 'LIVE' : 'DRY-RUN'}
+              />
+            </button>
+          </div>
+          <div className="space-y-1.5 text-xs">
+            <span className="block text-[var(--text-secondary)]">Status Siklus Terakhir</span>
+            <div className="flex h-9 items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 text-xs text-[var(--text-primary)]">
+              {lastCycle
+                ? `${lastCycle.plan.chosenAction} (${lastCycle.execution.mappedInput}) → ${lastCycle.execution.status}`
+                : 'Belum ada siklus dijalankan'}
+            </div>
+          </div>
+        </div>
+        {lastCycle && (
+          <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 text-[11px] text-[var(--text-secondary)]">
+            <strong>Alasan:</strong> {lastCycle.execution.reason} • <strong>Verifikasi:</strong>{' '}
+            {lastCycle.verification.note}
+          </div>
+        )}
+      </Panel>
 
       <Panel
         title="Pengawasan Manusia &amp; Pengambilalihan Kontrol"
@@ -599,7 +785,11 @@ export function AIControlPage({ platform, onNotify }: AIControlPageProps): React
         onCancel={() => setConfirmEmergency(false)}
         onConfirm={() => {
           setConfirmEmergency(false);
-          void backendService.supervisionEmergencyStop().then(() => loadAll());
+          setLoopActive(false);
+          void Promise.all([
+            backendService.stopRuntimeLoop('Emergency Stop diaktifkan'),
+            backendService.supervisionEmergencyStop(),
+          ]).then(() => loadAll());
         }}
       />
     </div>

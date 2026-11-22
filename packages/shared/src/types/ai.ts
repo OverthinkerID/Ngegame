@@ -62,6 +62,7 @@ export interface AIBrainThinkRequest {
     brightness: number;
     ocrText: string;
     hudSummary?: string[];
+    imageBase64?: string;
   };
 }
 

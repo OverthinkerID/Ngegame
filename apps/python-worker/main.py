@@ -5,6 +5,7 @@ import sys
 from typing import Any, Callable, Dict
 
 from worker.handlers.controller import (
+    handle_controller_diagnostics,
     handle_controller_emergency_stop,
     handle_controller_execute,
     handle_controller_pause,
@@ -35,6 +36,7 @@ HANDLERS: Dict[str, CommandHandler] = {
     "list_windows": handle_list_windows,
     "capture_frame": handle_capture_frame,
     "controller_status": handle_controller_status,
+    "controller_diagnostics": handle_controller_diagnostics,
     "controller_execute": handle_controller_execute,
     "controller_pause": handle_controller_pause,
     "controller_resume": handle_controller_resume,

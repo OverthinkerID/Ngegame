@@ -7,6 +7,7 @@ export type WorkerCommand =
   | 'list_windows'
   | 'capture_frame'
   | 'controller_status'
+  | 'controller_diagnostics'
   | 'controller_execute'
   | 'controller_pause'
   | 'controller_resume'
