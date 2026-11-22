@@ -42,6 +42,20 @@ export class ControllerService {
     return this.callWorkerState('controller_status');
   }
 
+  public async getDiagnostics(expectedGameTitle?: string): Promise<Record<string, unknown>> {
+    const res = await this.workerClient.sendCommand('controller_diagnostics', {
+      expectedGameTitle: expectedGameTitle ?? 'Stardew Valley',
+    });
+    if (!res.ok || !res.data) {
+      throw new AppError(
+        res.error?.message ?? 'Controller diagnostics failed',
+        ErrorCode.WORKER_EXECUTION_ERROR,
+        500,
+      );
+    }
+    return res.data;
+  }
+
   public async pause(): Promise<ControllerState> {
     const state = await this.callWorkerState('controller_pause');
     await recordSystemLog('info', 'controller', 'Controller paused');

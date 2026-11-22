@@ -209,12 +209,14 @@ export class GameBrainService {
         motionScore: visionCapture?.motionScore ?? 0,
         brightness: visionCapture?.brightness ?? 0.5,
         ocrText: observe.extractedText,
+        imageBase64: visionCapture?.imageBase64,
       },
     });
 
     const primaryAction = decision.actions[0] ?? {
       actionType: 'OBSERVE_ONLY' as AIActionType,
       target: 'active_scene',
+      parameters: {},
       durationMs: 250,
       confidence: observe.confidence,
       rationale: 'Tidak ada aksi terencana, fallback ke OBSERVE_ONLY.',
@@ -225,13 +227,19 @@ export class GameBrainService {
       profile.safetyConfiguration.maxHoldDurationMs,
     );
 
+    const effectiveObserveConf = observe.confidence > 0 ? observe.confidence : 0.75;
+    const combinedConfidence =
+      observe.screenState === 'gameplay'
+        ? Math.min(1, primaryAction.confidence * 0.75 + effectiveObserveConf * 0.25)
+        : Math.min(observe.confidence || 0.5, primaryAction.confidence);
+
     const plan = {
       goal,
       subTasks: profile.objectiveProfile.dailyTasks,
       chosenAction: primaryAction.actionType,
       target: primaryAction.target,
       durationMs: clampedDuration,
-      confidence: Math.min(observe.confidence || 0.5, primaryAction.confidence),
+      confidence: Number(combinedConfidence.toFixed(2)),
       rationale: primaryAction.rationale,
     };
 
@@ -283,6 +291,7 @@ export class GameBrainService {
         {
           durationMs: plan.durationMs,
           dryRun,
+          extraParameters: primaryAction.parameters,
         },
       );
 

@@ -34,7 +34,15 @@ export async function callOllama(
   systemPrompt: string,
   userPrompt: string,
   temperature: number,
+  imageBase64?: string,
 ): Promise<ProviderCallResult> {
+  const cleanImage = imageBase64?.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim();
+  const userMessage: Record<string, unknown> = {
+    role: 'user',
+    content: userPrompt,
+    ...(cleanImage ? { images: [cleanImage] } : {}),
+  };
+
   const res = await fetch(`${baseUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -46,7 +54,7 @@ export async function callOllama(
       options: { temperature },
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
+        userMessage,
       ],
     }),
   });
@@ -75,7 +83,24 @@ export async function callOpenAI(
   systemPrompt: string,
   userPrompt: string,
   temperature: number,
+  imageBase64?: string,
 ): Promise<ProviderCallResult> {
+  const cleanImage = imageBase64?.trim();
+  const userContent = cleanImage
+    ? [
+        { type: 'text', text: userPrompt },
+        {
+          type: 'image_url',
+          image_url: {
+            url: cleanImage.startsWith('data:')
+              ? cleanImage
+              : `data:image/png;base64,${cleanImage}`,
+            detail: 'low',
+          },
+        },
+      ]
+    : userPrompt;
+
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -89,7 +114,7 @@ export async function callOpenAI(
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
+        { role: 'user', content: userContent },
       ],
     }),
   });

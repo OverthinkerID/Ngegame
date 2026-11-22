@@ -22,9 +22,10 @@ export function buildSystemPrompt(genre: GameGenreTemplate): string {
     `Tindakan yang diizinkan HANYA: ${ALLOWED_AI_ACTIONS.join(', ')}.`,
     'ATURAN KETAT:',
     '1. Jangan pernah mengusulkan tindakan di luar daftar tindakan yang diizinkan.',
-    '2. Output WAJIB berupa JSON valid dengan struktur:',
+    '2. Untuk aksi MOVE_DIRECTION, WAJIB isi parameters dengan {"direction":"right"|"left"|"up"|"down"} dan durationMs antara 150-600.',
+    '3. Output WAJIB berupa JSON valid dengan struktur:',
     '{"gameStateSummary":"...","strategyPlan":"...","reasoning":"...","confidence":0.0-1.0,"actions":[{"actionType":"...","target":"...","parameters":{},"durationMs":300,"confidence":0.0-1.0,"rationale":"..."}]}',
-    '3. Semua rencana tindakan hanya berstatus planned_only (tidak dieksekusi langsung).',
+    '4. Semua rencana tindakan hanya berstatus planned_only (tidak dieksekusi langsung).',
   ].join('\n');
 }
 

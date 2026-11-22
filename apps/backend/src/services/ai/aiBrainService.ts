@@ -112,6 +112,7 @@ export class AIBrainService {
     provider: AIProviderType,
     systemPrompt: string,
     userPrompt: string,
+    imageBase64?: string,
   ): Promise<{ rawText: string; model: string; promptTokens: number; completionTokens: number }> {
     if (provider === 'ollama') {
       const res = await callOllama(
@@ -120,6 +121,7 @@ export class AIBrainService {
         systemPrompt,
         userPrompt,
         this.config.temperature,
+        imageBase64,
       );
       return { ...res, model: this.config.ollamaModel };
     }
@@ -134,6 +136,7 @@ export class AIBrainService {
       systemPrompt,
       userPrompt,
       this.config.temperature,
+      imageBase64,
     );
     return { ...res, model: this.config.openaiModel };
   }
@@ -171,6 +174,7 @@ export class AIBrainService {
     const genre = request.genre ?? this.config.genre;
     const systemPrompt = buildSystemPrompt(genre);
     const userPrompt = buildUserPrompt(request, this.sessionMemory);
+    const imageBase64 = request.visionState.imageBase64;
 
     let providerUsed: AIProviderType | 'deterministic-fallback' = this.config.primaryProvider;
     let modelUsed =
@@ -187,6 +191,7 @@ export class AIBrainService {
         this.config.primaryProvider,
         systemPrompt,
         userPrompt,
+        imageBase64,
       );
       rawJson = extractJsonObject(primary.rawText);
       modelUsed = primary.model;
@@ -207,6 +212,7 @@ export class AIBrainService {
             this.config.fallbackProvider,
             systemPrompt,
             userPrompt,
+            imageBase64,
           );
           rawJson = extractJsonObject(secondary.rawText);
           providerUsed = this.config.fallbackProvider;

@@ -304,6 +304,33 @@ export const backendService = {
     return requestJson<ControllerState>('/api/controller/status');
   },
 
+  async getControllerDiagnostics(expectedGameTitle?: string): Promise<{
+    platform: string;
+    release?: string;
+    machine?: string;
+    visibleWindowCount?: number;
+    focusedWindow?: { title?: string; owner?: string; focused?: boolean } | null;
+    expectedGame?: string | null;
+    gameWindowFound?: boolean;
+    gameWindow?: { title?: string; owner?: string; focused?: boolean } | null;
+    liveBackend?: string;
+    macos?: {
+      accessibilityTrusted?: boolean | null;
+      screenRecordingGranted?: boolean | null;
+      instructions?: string[];
+    };
+    windows?: {
+      isElevatedAdmin?: boolean;
+      inputMethod?: string;
+      note?: string;
+    };
+  }> {
+    const qs = expectedGameTitle
+      ? `?expectedGameTitle=${encodeURIComponent(expectedGameTitle)}`
+      : '';
+    return requestJson(`/api/controller/diagnostics${qs}`);
+  },
+
   async executeControllerAction(
     req: ControllerExecuteRequest,
   ): Promise<ControllerExecutionResult> {
@@ -883,6 +910,9 @@ export const backendService = {
 
   async getRuntimeStatus(): Promise<{
     phase: string;
+    loopActive?: boolean;
+    loopDryRun?: boolean;
+    loopIntervalMs?: number;
     activeSession: {
       id: string;
       title: string;
@@ -894,6 +924,8 @@ export const backendService = {
     activeGameName: string | null;
     currentTask: string | null;
     gameState: string;
+    lastCycleId?: string | null;
+    lastCycleAt?: string | null;
     aiProviderHealth: AIProviderHealth | null;
     controllerStatus: ControllerState | null;
     supervisionState: SupervisionState | null;
@@ -905,6 +937,41 @@ export const backendService = {
 
   async startRuntimeSession(req: { gameId: string; windowTitle?: string; goal?: string }) {
     return requestJson('/api/runtime/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+  },
+
+  async startRuntimeLoop(req: {
+    gameId: string;
+    windowTitle?: string;
+    dryRun?: boolean;
+    intervalMs?: number;
+    goalOverride?: string;
+  }) {
+    return requestJson('/api/runtime/loop/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+  },
+
+  async stopRuntimeLoop(reason?: string) {
+    return requestJson('/api/runtime/loop/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  async runRuntimeStep(req: {
+    gameId?: string;
+    windowTitle?: string;
+    dryRun?: boolean;
+    goalOverride?: string;
+  }): Promise<{ runtime: unknown; cycle: GameBrainCycleResult }> {
+    return requestJson('/api/runtime/step', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),

@@ -14,6 +14,18 @@ export function createControllerRouter(controllerService: ControllerService): Ro
     }
   });
 
+  router.get('/diagnostics', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const expectedGame =
+        typeof req.query.expectedGameTitle === 'string'
+          ? req.query.expectedGameTitle
+          : undefined;
+      res.json(await controllerService.getDiagnostics(expectedGame));
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.post('/execute', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = req.body as Partial<ControllerExecuteRequest> | undefined;
