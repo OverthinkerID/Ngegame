@@ -15,6 +15,7 @@ import {
 } from '@ngegame/shared';
 import { getPrismaClient, recordSystemLog } from '../../db/prisma.js';
 import { Logger } from '../../utils/logger.js';
+import { UserDataStorageService } from '../persistence/userDataStorage.js';
 import { assessGameCompatibility } from './compatibility.js';
 import { createSteamScanner, type PlatformSteamScanner } from './scanners.js';
 import { parseVdf, type VdfObject } from './vdfParser.js';
@@ -48,12 +49,19 @@ export class SteamManager {
   private readonly logger: Logger;
   private readonly customSteamPath?: string;
   private readonly scanner: PlatformSteamScanner;
+  private readonly storage: UserDataStorageService;
   private lastDiagnostics: import('@ngegame/shared').SteamScannerDiagnostics | null = null;
 
-  constructor(options?: { steamPath?: string; logger?: Logger; scanner?: PlatformSteamScanner }) {
+  constructor(options?: {
+    steamPath?: string;
+    logger?: Logger;
+    scanner?: PlatformSteamScanner;
+    storage?: UserDataStorageService;
+  }) {
     this.customSteamPath = options?.steamPath ?? process.env.STEAM_PATH;
     this.logger = options?.logger ?? new Logger('steam-manager');
     this.scanner = options?.scanner ?? createSteamScanner(process.platform, this.customSteamPath);
+    this.storage = options?.storage ?? new UserDataStorageService();
   }
 
   public getDiagnostics(): import('@ngegame/shared').SteamScannerDiagnostics | null {
@@ -465,6 +473,7 @@ export class SteamManager {
           discoveredAppIds.add(appId);
           const executablePath = await this.detectExecutable(installPath, name);
           const compatibility = assessGameCompatibility(appId, executablePath !== null);
+          const defaultArtworkUrl = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900_2x.jpg`;
 
           await prisma.steamGame.upsert({
             where: { appId },
@@ -475,9 +484,14 @@ export class SteamManager {
               installPath,
               executablePath,
               sizeOnDiskBytes: Number.isNaN(sizeOnDiskBytes) ? 0 : sizeOnDiskBytes,
+              platform: process.platform,
+              installed: true,
+              detectionSource: 'steam_vdf',
+              artworkUrl: defaultArtworkUrl,
               compatibility: compatibility.status,
               compatibilityReason: compatibility.reason,
               lastScannedAt: scannedAt,
+              lastSeenAt: scannedAt,
             },
             update: {
               name,
@@ -485,9 +499,14 @@ export class SteamManager {
               installPath,
               executablePath,
               sizeOnDiskBytes: Number.isNaN(sizeOnDiskBytes) ? 0 : sizeOnDiskBytes,
+              platform: process.platform,
+              installed: true,
+              detectionSource: 'steam_vdf',
+              artworkUrl: defaultArtworkUrl,
               compatibility: compatibility.status,
               compatibilityReason: compatibility.reason,
               lastScannedAt: scannedAt,
+              lastSeenAt: scannedAt,
             },
           });
         } catch (err) {
@@ -499,11 +518,10 @@ export class SteamManager {
       }
     }
 
-    if (discoveredAppIds.size === 0) {
-      await prisma.steamGame.deleteMany({});
-    } else {
-      await prisma.steamGame.deleteMany({
+    if (discoveredAppIds.size > 0) {
+      await prisma.steamGame.updateMany({
         where: { appId: { notIn: Array.from(discoveredAppIds) } },
+        data: { installed: false, lastScannedAt: scannedAt },
       });
     }
 
@@ -522,6 +540,8 @@ export class SteamManager {
 
     await recordSystemLog('info', 'steam', `Steam library scan completed (${discoveredAppIds.size} games found)`);
 
+    void this.cacheMissingArtwork().catch(() => undefined);
+
     const games = await this.listGames();
     return {
       installation,
@@ -530,11 +550,71 @@ export class SteamManager {
     };
   }
 
+  private async cacheArtworkForApp(appId: number): Promise<string | null> {
+    const candidates = [
+      `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900_2x.jpg`,
+      `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`,
+    ];
+    for (const url of candidates) {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+        if (!res.ok) continue;
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.byteLength < 1024) continue;
+        const asset = await this.storage.saveBuffer({
+          category: 'artwork',
+          originalName: `steam-${appId}.jpg`,
+          buffer: buf,
+          mimeType: res.headers.get('content-type') || 'image/jpeg',
+          entityType: 'steam_game',
+          entityId: String(appId),
+        });
+        const prisma = getPrismaClient();
+        await prisma.steamGame.update({
+          where: { appId },
+          data: {
+            artworkAssetId: asset.id,
+            artworkUrl: asset.url,
+          },
+        });
+        return asset.url;
+      } catch {
+        // try next candidate
+      }
+    }
+    return null;
+  }
+
+  private async cacheMissingArtwork(): Promise<number> {
+    const prisma = getPrismaClient();
+    const games = await prisma.steamGame.findMany({
+      where: { artworkAssetId: null },
+      take: 25,
+    });
+    let cached = 0;
+    for (const g of games) {
+      const url = await this.cacheArtworkForApp(g.appId);
+      if (url) cached += 1;
+    }
+    return cached;
+  }
+
+  public async refreshMetadata(): Promise<{ updated: number; games: SteamGameRecord[] }> {
+    const prisma = getPrismaClient();
+    const games = await prisma.steamGame.findMany();
+    let updated = 0;
+    for (const g of games) {
+      const url = await this.cacheArtworkForApp(g.appId);
+      if (url) updated += 1;
+    }
+    return { updated, games: await this.listGames() };
+  }
+
   public async listGames(): Promise<SteamGameRecord[]> {
     const prisma = getPrismaClient();
     const [rows, processes] = await Promise.all([
       prisma.steamGame.findMany({
-        orderBy: { name: 'asc' },
+        orderBy: [{ installed: 'desc' }, { name: 'asc' }],
       }),
       this.listRunningProcesses(),
     ]);
@@ -552,11 +632,19 @@ export class SteamManager {
         installPath: row.installPath,
         executablePath: row.executablePath,
         sizeOnDiskBytes: row.sizeOnDiskBytes,
+        platform: row.platform,
+        installed: row.installed,
+        detectionSource: row.detectionSource,
+        artworkAssetId: row.artworkAssetId,
+        artworkUrl: row.artworkAssetId
+          ? `/api/persistence/assets/${encodeURIComponent(row.artworkAssetId)}/content`
+          : row.artworkUrl,
         compatibility: row.compatibility as SteamGameCompatibility,
         compatibilityReason: row.compatibilityReason,
         isRunning: running !== null,
         pid: running?.pid ?? null,
         lastScannedAt: row.lastScannedAt.toISOString(),
+        lastSeenAt: row.lastSeenAt.toISOString(),
         lastLaunchedAt: row.lastLaunchedAt ? row.lastLaunchedAt.toISOString() : null,
       };
     });

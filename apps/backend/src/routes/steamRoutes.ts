@@ -80,6 +80,15 @@ export function createSteamRouter(steamManager = new SteamManager()): Router {
     }
   });
 
+  router.post('/refresh-metadata', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await steamManager.refreshMetadata();
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.post('/games/:appId/launch', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const appId = Number.parseInt(String(req.params.appId), 10);

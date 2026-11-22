@@ -36,6 +36,8 @@ export interface VisionGameEvent {
 
 export interface VisionAnalysisResult {
   id?: number;
+  snapshotAssetId?: string | null;
+  snapshotUrl?: string | null;
   windowTitle: string;
   platform: string;
   width: number;

@@ -42,13 +42,20 @@ model SteamGame {
   installPath         String
   executablePath      String?
   sizeOnDiskBytes     Int       @default(0)
+  platform            String    @default("steam")
+  installed           Boolean   @default(true)
+  detectionSource     String    @default("steam_vdf")
+  artworkAssetId      String?
+  artworkUrl          String?
   compatibility       String    @default("unknown")
   compatibilityReason String    @default("")
   lastScannedAt       DateTime  @default(now())
+  lastSeenAt          DateTime  @default(now())
   lastLaunchedAt      DateTime?
   updatedAt           DateTime  @updatedAt
 
   @@index([compatibility])
+  @@index([installed])
 }
 
 model VisionCapture {
@@ -380,17 +387,20 @@ model CommentaryHistory {
 }
 
 model VoiceProfile {
-  id             String   @id
-  name           String
-  engine         String   @default("voxcpm2")
-  language       String   @default("id")
-  speed          Float    @default(1.0)
-  pitch          Float    @default(1.0)
-  emotion        String   @default("neutral")
-  expressiveness Float    @default(0.7)
-  isDefault      Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                String   @id
+  name              String
+  description       String   @default("")
+  engine            String   @default("voxcpm2")
+  language          String   @default("id")
+  speed             Float    @default(1.0)
+  pitch             Float    @default(1.0)
+  emotion           String   @default("neutral")
+  expressiveness    Float    @default(0.7)
+  modelSettingsJson String   @default("{}")
+  defaultSampleId   String?
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model ChatInteraction {
@@ -479,4 +489,113 @@ model StreamSessionSummary {
   createdAt                DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model StoredAsset {
+  id             String   @id @default(cuid())
+  category       String
+  originalName   String
+  storedName     String
+  relativePath   String
+  mimeType       String
+  sizeBytes      Int      @default(0)
+  checksumSha256 String   @default("")
+  entityType     String?
+  entityId       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([category, createdAt])
+  @@index([entityType, entityId])
+}
+
+model UserProfile {
+  id                    String   @id @default(cuid())
+  displayName           String
+  handle                String   @default("")
+  bio                   String   @default("")
+  avatarAssetId         String?
+  preferredLanguage     String   @default("id")
+  defaultGameId         String?
+  defaultVoiceProfileId String?
+  isActive              Boolean  @default(false)
+  preferencesJson       String   @default("{}")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model ThemeSetting {
+  id                Int      @id @default(1)
+  mode              String   @default("dark")
+  accentColor       String   @default("#39c5bb")
+  primaryColor      String   @default("#39c5bb")
+  secondaryColor    String   @default("#6366f1")
+  backgroundColor   String   @default("#0a0e09")
+  customThemeName   String   @default("Overthinker Olive")
+  fontPreference    String   @default("system")
+  uiPreferencesJson String   @default("{}")
+  updatedAt         DateTime @updatedAt
+}
+
+model VoiceSample {
+  id              String   @id @default(cuid())
+  name            String
+  language        String   @default("id")
+  durationSeconds Float    @default(0)
+  voiceProfileId  String?
+  assetId         String
+  transcript      String   @default("")
+  recordedAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([voiceProfileId])
+  @@index([createdAt])
+}
+
+model VoiceCloneJob {
+  id             String   @id @default(cuid())
+  sourceSampleId String?
+  voiceProfileId String?
+  text           String
+  emotion        String   @default("neutral")
+  modelProvider  String   @default("voxcpm2")
+  configJson     String   @default("{}")
+  outputAssetId  String?
+  status         String   @default("completed")
+  errorMessage   String?
+  latencyMs      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([voiceProfileId, createdAt])
+  @@index([createdAt])
+}
+
+model VisionSession {
+  id                  String    @id @default(cuid())
+  gameId              String?
+  captureSource       String    @default("Primary Display")
+  targetWindow        String    @default("Primary Display")
+  width               Int       @default(0)
+  height              Int       @default(0)
+  samplingIntervalMs  Int       @default(1000)
+  status              String    @default("idle")
+  overlayEnabled      Boolean   @default(true)
+  lastCaptureAt       DateTime?
+  lastSnapshotAssetId String?
+  lastAnalysisJson    String    @default("{}")
+  captureConfigJson   String    @default("{}")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([updatedAt])
+}
+
+model AppRuntimeState {
+  key       String   @id
+  valueJson String   @default("{}")
+  updatedAt DateTime @updatedAt
 }

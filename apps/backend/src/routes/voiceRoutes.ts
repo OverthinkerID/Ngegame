@@ -18,16 +18,105 @@ export function createVoiceRouter(voiceService = new VoiceStudioService()): Rout
     }
   });
 
-  router.get('/settings', (_req: Request, res: Response) => {
-    res.json(voiceService.getSettings());
+  router.get('/settings', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await voiceService.getSettings());
+    } catch (err) {
+      next(err);
+    }
   });
 
-  router.put('/settings', (req: Request, res: Response) => {
-    res.json(voiceService.updateSettings(req.body ?? {}));
+  router.put('/settings', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(await voiceService.updateSettings(req.body ?? {}));
+    } catch (err) {
+      next(err);
+    }
   });
 
-  router.get('/profiles', (_req: Request, res: Response) => {
-    res.json({ ok: true, profiles: voiceService.listProfiles() });
+  router.get('/profiles', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ ok: true, profiles: await voiceService.listProfiles() });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/profiles', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const profile = await voiceService.upsertProfile(req.body ?? {});
+      res.status(201).json({ ok: true, profile });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/samples', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ ok: true, samples: await voiceService.listSamples() });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post('/samples', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as {
+        name?: string;
+        language?: string;
+        durationSeconds?: number;
+        voiceProfileId?: string | null;
+        transcript?: string;
+        audioBase64?: string;
+        fileName?: string;
+        mimeType?: string;
+      };
+      if (!body?.audioBase64) {
+        throw new AppError('audioBase64 is required', ErrorCode.VALIDATION_ERROR, 400);
+      }
+      const sample = await voiceService.saveSample({
+        name: body.name ?? body.fileName ?? 'Voice Sample',
+        language: body.language,
+        durationSeconds: body.durationSeconds,
+        voiceProfileId: body.voiceProfileId,
+        transcript: body.transcript,
+        audioBase64: body.audioBase64,
+        fileName: body.fileName,
+        mimeType: body.mimeType,
+      });
+      res.status(201).json({ ok: true, sample });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.delete('/samples/:id', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const deleted = await voiceService.deleteSample(String(req.params.id));
+      res.json({ ok: true, deleted });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/jobs', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rawLimit =
+        typeof req.query.limit === 'string' ? Number.parseInt(req.query.limit, 10) : 30;
+      const jobs = await voiceService.listCloneJobs(Number.isNaN(rawLimit) ? 30 : rawLimit);
+      res.json({ ok: true, jobs });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.delete('/jobs/:id', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const deleted = await voiceService.deleteCloneJob(String(req.params.id));
+      res.json({ ok: true, deleted });
+    } catch (err) {
+      next(err);
+    }
   });
 
   router.post('/speak', async (req: Request, res: Response, next: NextFunction) => {

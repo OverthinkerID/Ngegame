@@ -1,11 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import type { ComponentStatus } from '@ngegame/shared';
 import { Logger } from '../utils/logger.js';
+import { ensurePersistenceSchema } from './schemaSync.js';
 
 const logger = new Logger('database');
 
 let prismaInstance: PrismaClient | null = null;
 let sqliteConfigured = false;
+let schemaSyncPromise: Promise<void> | null = null;
 
 export function getPrismaClient(): PrismaClient {
   if (!process.env.DATABASE_URL) {
@@ -14,12 +16,24 @@ export function getPrismaClient(): PrismaClient {
   if (!prismaInstance) {
     prismaInstance = new PrismaClient();
     sqliteConfigured = false;
+    schemaSyncPromise = null;
   }
   if (!sqliteConfigured) {
     sqliteConfigured = true;
     void configureSqlitePragmas(prismaInstance);
   }
+  if (!schemaSyncPromise) {
+    schemaSyncPromise = ensurePersistenceSchema(prismaInstance);
+  }
   return prismaInstance;
+}
+
+export async function waitForSchemaReady(): Promise<void> {
+  const client = getPrismaClient();
+  if (!schemaSyncPromise) {
+    schemaSyncPromise = ensurePersistenceSchema(client);
+  }
+  await schemaSyncPromise;
 }
 
 async function configureSqlitePragmas(prisma: PrismaClient): Promise<void> {

@@ -18,6 +18,7 @@ import {
   ToastNotification,
 } from './components/ui/FeedbackComponents.js';
 import { ThemeProvider } from './context/ThemeContext.js';
+import { AppStateProvider } from './context/AppStateContext.js';
 import { AIControlPage } from './pages/AIControlPage.js';
 import { AnalyticsPage } from './pages/AnalyticsPage.js';
 import { GameAdaptationStudioPage } from './pages/GameAdaptationStudioPage.js';
@@ -32,6 +33,7 @@ import { SystemMonitorPage } from './pages/SystemMonitorPage.js';
 import { VisionMonitorPage } from './pages/VisionMonitorPage.js';
 import { VoiceStudioPage } from './pages/VoiceStudioPage.js';
 import { BACKEND_WS_URL, backendService } from './services/backendService.js';
+import { wsManager } from './services/wsManager.js';
 import type { PageId } from './types/dashboard.js';
 import { parseFriendlyError } from './utils/guideHelper.js';
 
@@ -166,50 +168,42 @@ function DashboardShell(): React.JSX.Element {
   useEffect(() => {
     void refreshBackendData(true);
     void backendService.getUpdaterState().then(setUpdateState).catch(() => undefined);
+    void backendService
+      .getRuntimeStateMap()
+      .then((state) => {
+        if (typeof state.activePage === 'string') {
+          setActivePage(state.activePage as PageId);
+        }
+        if (typeof state.settingsTab === 'string') {
+          setSettingsTab(state.settingsTab as SettingsTab);
+        }
+      })
+      .catch(() => undefined);
     return backendService.onUpdaterStateChanged((st) => setUpdateState(st));
   }, [refreshBackendData]);
 
+  const handleSelectPage = useCallback((page: PageId) => {
+    setActivePage(page);
+    void backendService.setRuntimeState('activePage', page).catch(() => undefined);
+  }, []);
+
   useEffect(() => {
-    let closed = false;
-    let ws: WebSocket | null = null;
-    let retryTimer: number | null = null;
-    let attempt = 0;
-
-    const connect = (): void => {
-      if (closed) return;
-      const wsUrl = appInfo?.backendUrl
-        ? `${appInfo.backendUrl.replace(/^http/, 'ws')}/ws`
-        : BACKEND_WS_URL;
-      ws = new WebSocket(wsUrl);
-      ws.onopen = () => {
-        attempt = 0;
-      };
-      ws.onmessage = (evt) => {
-        try {
-          const msg = JSON.parse(String(evt.data)) as { type?: string };
-          if (msg.type === 'runtime:state' || msg.type === 'runtime:cycle') {
-            void refreshBackendData(true);
-          }
-        } catch {
-          // Abaikan payload non-JSON
-        }
-      };
-      ws.onclose = () => {
-        if (closed) return;
-        attempt += 1;
-        const delayMs = Math.min(1500 * attempt, 5000);
-        retryTimer = window.setTimeout(connect, delayMs);
-      };
-      ws.onerror = () => {
-        ws?.close();
-      };
-    };
-
-    connect();
+    const wsUrl = appInfo?.backendUrl
+      ? `${appInfo.backendUrl.replace(/^http/, 'ws')}/ws`
+      : BACKEND_WS_URL;
+    const releaseWs = wsManager.retain(wsUrl);
+    const unsubEvents = wsManager.subscribe((msg) => {
+      if (msg.type === 'runtime:state' || msg.type === 'runtime:cycle') {
+        void refreshBackendData(true);
+      }
+    });
+    const unsubResync = wsManager.onReconnectResync(() => {
+      void refreshBackendData(true);
+    });
     return () => {
-      closed = true;
-      if (retryTimer !== null) window.clearTimeout(retryTimer);
-      ws?.close();
+      unsubEvents();
+      unsubResync();
+      releaseWs();
     };
   }, [appInfo?.backendUrl, refreshBackendData]);
 
@@ -286,7 +280,7 @@ function DashboardShell(): React.JSX.Element {
         scannedGames={scannedGames}
         workerOnline={workerOnline}
         pinging={pinging}
-        onSelectPage={setActivePage}
+        onSelectPage={handleSelectPage}
         onPingWorker={() => void handlePingWorker()}
         onLaunchQuickGame={(game) => void handleLaunchQuickGame(game)}
       />
@@ -300,7 +294,7 @@ function DashboardShell(): React.JSX.Element {
           obsConnected={Boolean(streamingStatus?.obsConnected)}
           loading={loading}
           platform={appInfo?.platform}
-          onSelectPage={setActivePage}
+          onSelectPage={handleSelectPage}
           onRefresh={() => void refreshBackendData(false)}
           onPauseOrResumeAI={() => void handlePauseOrResumeAI()}
           onTakeoverOrReturn={() => void handleTakeoverOrReturn()}
@@ -376,7 +370,9 @@ function DashboardShell(): React.JSX.Element {
 export function App(): React.JSX.Element {
   return (
     <ThemeProvider>
-      <DashboardShell />
+      <AppStateProvider>
+        <DashboardShell />
+      </AppStateProvider>
     </ThemeProvider>
   );
 }

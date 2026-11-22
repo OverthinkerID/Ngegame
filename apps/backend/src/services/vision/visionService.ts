@@ -5,17 +5,31 @@ import {
   type VisionAnalysisResult,
   type VisionCapabilities,
   type VisionMonitorStatus,
+  type VisionSessionRecord,
 } from '@ngegame/shared';
 import { getPrismaClient, recordSystemLog } from '../../db/prisma.js';
 import { Logger } from '../../utils/logger.js';
 import type { PythonWorkerClient } from '../../workers/pythonWorkerClient.js';
+import { UserDataStorageService } from '../persistence/userDataStorage.js';
 
 export type WsBroadcaster = (eventType: string, payload: unknown) => void;
+const DEFAULT_VISION_SESSION_ID = 'default-vision-session';
+
+function decodeImageBase64(raw: string): { buffer: Buffer; mimeType: string; ext: string } {
+  const match = raw.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/i);
+  if (match) {
+    const mimeType = match[1] || 'image/jpeg';
+    const ext = mimeType.includes('png') ? 'png' : 'jpg';
+    return { mimeType, ext, buffer: Buffer.from(match[2] ?? '', 'base64') };
+  }
+  return { mimeType: 'image/jpeg', ext: 'jpg', buffer: Buffer.from(raw, 'base64') };
+}
 
 export class VisionService {
   private readonly workerClient: PythonWorkerClient;
   private readonly broadcast: WsBroadcaster;
   private readonly logger: Logger;
+  private readonly storage: UserDataStorageService;
 
   private running = false;
   private targetWindow: string | null = null;
@@ -31,10 +45,12 @@ export class VisionService {
     workerClient: PythonWorkerClient,
     broadcast: WsBroadcaster = () => {},
     logger = new Logger('vision-service'),
+    storage = new UserDataStorageService(),
   ) {
     this.workerClient = workerClient;
     this.broadcast = broadcast;
     this.logger = logger;
+    this.storage = storage;
   }
 
   public async getCapabilities(): Promise<VisionCapabilities> {
@@ -82,6 +98,127 @@ export class VisionService {
     };
   }
 
+  public async getSession(): Promise<VisionSessionRecord> {
+    const prisma = getPrismaClient();
+    const row = await prisma.visionSession.upsert({
+      where: { id: DEFAULT_VISION_SESSION_ID },
+      create: {
+        id: DEFAULT_VISION_SESSION_ID,
+        captureSource: this.targetWindow ?? 'Primary Display',
+        targetWindow: this.targetWindow ?? 'Primary Display',
+        samplingIntervalMs: this.samplingIntervalMs,
+        status: this.running ? 'active' : 'idle',
+      },
+      update: {
+        status: this.running ? 'active' : 'idle',
+      },
+    });
+
+    let lastAnalysis: Record<string, unknown> | null = null;
+    try {
+      const parsed = JSON.parse(row.lastAnalysisJson) as Record<string, unknown>;
+      if (parsed && Object.keys(parsed).length > 0) {
+        lastAnalysis = parsed;
+      }
+    } catch {
+      lastAnalysis = null;
+    }
+
+    let captureConfig: Record<string, unknown> = {};
+    try {
+      captureConfig = JSON.parse(row.captureConfigJson) as Record<string, unknown>;
+    } catch {
+      captureConfig = {};
+    }
+
+    return {
+      id: row.id,
+      gameId: row.gameId,
+      captureSource: row.captureSource,
+      targetWindow: row.targetWindow,
+      width: row.width,
+      height: row.height,
+      samplingIntervalMs: row.samplingIntervalMs,
+      status: this.running ? 'active' : ((row.status as VisionSessionRecord['status']) || 'idle'),
+      overlayEnabled: row.overlayEnabled,
+      lastCaptureAt: row.lastCaptureAt ? row.lastCaptureAt.toISOString() : null,
+      lastSnapshotAssetId: row.lastSnapshotAssetId,
+      snapshotUrl: row.lastSnapshotAssetId
+        ? `/api/persistence/assets/${encodeURIComponent(row.lastSnapshotAssetId)}/content`
+        : null,
+      lastAnalysis,
+      captureConfig,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  public async updateSessionConfig(patch: {
+    gameId?: string | null;
+    captureSource?: string;
+    targetWindow?: string;
+    overlayEnabled?: boolean;
+    samplingIntervalMs?: number;
+    captureConfig?: Record<string, unknown>;
+  }): Promise<VisionSessionRecord> {
+    const prisma = getPrismaClient();
+    if (patch.targetWindow) {
+      this.targetWindow = patch.targetWindow;
+    }
+    if (typeof patch.samplingIntervalMs === 'number' && patch.samplingIntervalMs >= 350) {
+      this.samplingIntervalMs = Math.round(patch.samplingIntervalMs);
+    }
+    await prisma.visionSession.upsert({
+      where: { id: DEFAULT_VISION_SESSION_ID },
+      create: {
+        id: DEFAULT_VISION_SESSION_ID,
+        gameId: patch.gameId ?? null,
+        captureSource: patch.captureSource ?? patch.targetWindow ?? 'Primary Display',
+        targetWindow: patch.targetWindow ?? 'Primary Display',
+        samplingIntervalMs: this.samplingIntervalMs,
+        overlayEnabled: patch.overlayEnabled ?? true,
+        status: this.running ? 'active' : 'idle',
+        captureConfigJson: JSON.stringify(patch.captureConfig ?? {}),
+      },
+      update: {
+        ...(patch.gameId !== undefined ? { gameId: patch.gameId } : {}),
+        ...(patch.captureSource !== undefined ? { captureSource: patch.captureSource } : {}),
+        ...(patch.targetWindow !== undefined ? { targetWindow: patch.targetWindow } : {}),
+        ...(patch.overlayEnabled !== undefined ? { overlayEnabled: patch.overlayEnabled } : {}),
+        ...(patch.samplingIntervalMs !== undefined
+          ? { samplingIntervalMs: this.samplingIntervalMs }
+          : {}),
+        ...(patch.captureConfig !== undefined
+          ? { captureConfigJson: JSON.stringify(patch.captureConfig) }
+          : {}),
+      },
+    });
+    return this.getSession();
+  }
+
+  public async clearSnapshot(): Promise<VisionSessionRecord> {
+    const prisma = getPrismaClient();
+    const current = await prisma.visionSession.findUnique({
+      where: { id: DEFAULT_VISION_SESSION_ID },
+    });
+    if (current?.lastSnapshotAssetId) {
+      await this.storage.deleteAsset(current.lastSnapshotAssetId);
+    }
+    await prisma.visionSession.upsert({
+      where: { id: DEFAULT_VISION_SESSION_ID },
+      create: {
+        id: DEFAULT_VISION_SESSION_ID,
+        lastSnapshotAssetId: null,
+        lastAnalysisJson: '{}',
+      },
+      update: {
+        lastSnapshotAssetId: null,
+        lastAnalysisJson: '{}',
+      },
+    });
+    return this.getSession();
+  }
+
   private computeNextInterval(motionScore: number, processingMs: number): number {
     if (processingMs >= 350) {
       return Math.min(3000, this.samplingIntervalMs + 350);
@@ -125,6 +262,32 @@ export class VisionService {
     );
 
     const prisma = getPrismaClient();
+    let snapshotAssetId: string | null = null;
+    let snapshotUrl: string | null = null;
+
+    if (analysis.imageBase64) {
+      try {
+        const decoded = decodeImageBase64(analysis.imageBase64);
+        if (decoded.buffer.byteLength > 0) {
+          const asset = await this.storage.saveBuffer({
+            category: 'vision_snapshot',
+            originalName: `vision-snapshot-${Date.now()}.${decoded.ext}`,
+            buffer: decoded.buffer,
+            mimeType: decoded.mimeType,
+            entityType: 'vision_session',
+            entityId: DEFAULT_VISION_SESSION_ID,
+          });
+          snapshotAssetId = asset.id;
+          snapshotUrl = asset.url;
+          await this.storage.cleanupCategoryRetention('vision_snapshot', 10, [asset.id]);
+        }
+      } catch (err) {
+        this.logger.warn('Failed to persist vision snapshot file', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     const saved = await prisma.visionCapture.create({
       data: {
         windowTitle: analysis.windowTitle,
@@ -144,9 +307,59 @@ export class VisionService {
       },
     });
 
+    const compactAnalysis = {
+      id: saved.id,
+      windowTitle: analysis.windowTitle,
+      platform: analysis.platform,
+      width: analysis.width,
+      height: analysis.height,
+      sceneLabel: analysis.sceneLabel,
+      motionScore: analysis.motionScore,
+      brightness: analysis.brightness,
+      processingMs: analysis.processingMs,
+      samplingIntervalMs: this.samplingIntervalMs,
+      ocrText: analysis.ocrText,
+      hud: analysis.hud,
+      objects: analysis.objects,
+      events: analysis.events,
+      capabilities: analysis.capabilities,
+      createdAt: analysis.createdAt,
+      snapshotAssetId,
+      snapshotUrl,
+    };
+
+    await prisma.visionSession.upsert({
+      where: { id: DEFAULT_VISION_SESSION_ID },
+      create: {
+        id: DEFAULT_VISION_SESSION_ID,
+        captureSource: windowTitle,
+        targetWindow: windowTitle,
+        width: analysis.width,
+        height: analysis.height,
+        samplingIntervalMs: this.samplingIntervalMs,
+        status: this.running ? 'active' : 'idle',
+        lastCaptureAt: new Date(analysis.createdAt),
+        lastSnapshotAssetId: snapshotAssetId,
+        lastAnalysisJson: JSON.stringify(compactAnalysis),
+      },
+      update: {
+        captureSource: windowTitle,
+        targetWindow: windowTitle,
+        width: analysis.width,
+        height: analysis.height,
+        samplingIntervalMs: this.samplingIntervalMs,
+        status: this.running ? 'active' : 'idle',
+        lastCaptureAt: new Date(analysis.createdAt),
+        ...(snapshotAssetId ? { lastSnapshotAssetId: snapshotAssetId } : {}),
+        lastAnalysisJson: JSON.stringify(compactAnalysis),
+      },
+    });
+
     const enriched: VisionAnalysisResult = {
       ...analysis,
       id: saved.id,
+      snapshotAssetId,
+      snapshotUrl,
       samplingIntervalMs: this.samplingIntervalMs,
     };
 
@@ -168,6 +381,11 @@ export class VisionService {
       this.samplingIntervalMs = options.baseIntervalMs;
     }
 
+    await this.updateSessionConfig({
+      targetWindow: this.targetWindow,
+      captureSource: this.targetWindow,
+      samplingIntervalMs: this.samplingIntervalMs,
+    });
     await recordSystemLog('info', 'vision', `Vision monitor started (${this.targetWindow})`);
     this.scheduleNextTick(0);
     return this.getStatus();
@@ -203,6 +421,13 @@ export class VisionService {
       clearTimeout(this.timer);
       this.timer = null;
     }
+    const prisma = getPrismaClient();
+    await prisma.visionSession
+      .updateMany({
+        where: { id: DEFAULT_VISION_SESSION_ID },
+        data: { status: 'stopped' },
+      })
+      .catch(() => undefined);
     await recordSystemLog('info', 'vision', 'Vision monitor stopped');
     return this.getStatus();
   }
