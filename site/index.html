@@ -1,206 +1,563 @@
 <!doctype html>
-<html lang="id">
+<html lang="id" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Ngegame oleh Overthinker Studio — Aplikasi desktop AI Gaming, Monitor Visi real-time, pengawasan manusia L1/L2/L3, VoxCPM 2.0, dan Studio Siaran OBS WebSocket." />
   <title>Ngegame — Overthinker Studio</title>
   <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
   <style>
     :root {
-      --bg: #0f130e;
-      --bg-bar: rgba(16, 21, 15, 0.92);
-      --surface: #181e16;
-      --surface-2: #20281d;
-      --border: #2c3827;
+      --bg: #0b0e0a;
+      --bg-elevated: #121710;
+      --bg-bar: rgba(11, 14, 10, 0.82);
+      --surface: rgba(20, 26, 18, 0.78);
+      --surface-solid: #151b13;
+      --surface-2: #1c2419;
+      --border: rgba(255, 255, 255, 0.09);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      --grid-line: rgba(111, 156, 78, 0.06);
       --olive: #6f9c4e;
+      --olive-bright: #8cc263;
       --olive-dark: #394f29;
       --blue: #009eeb;
       --orange: #ff9233;
-      --text: #f3f6f1;
-      --muted: #a3b19c;
+      --text: #f4f7f2;
+      --text-secondary: #b5c2ae;
+      --muted: #8b9984;
+      --code-bg: #090c08;
+      --code-text: #d9f99d;
+      --shadow-card: 0 18px 40px rgba(0, 0, 0, 0.35);
+      --shadow-glow: 0 0 0 1px rgba(111, 156, 78, 0.28), 0 18px 48px rgba(111, 156, 78, 0.12);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
+      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
-    * { box-sizing: border-box; }
+
+    html[data-theme="light"] {
+      --bg: #f6f8f4;
+      --bg-elevated: #ffffff;
+      --bg-bar: rgba(246, 248, 244, 0.86);
+      --surface: rgba(255, 255, 255, 0.92);
+      --surface-solid: #ffffff;
+      --surface-2: #edf2e8;
+      --border: rgba(22, 34, 18, 0.1);
+      --border-strong: rgba(22, 34, 18, 0.18);
+      --grid-line: rgba(57, 79, 41, 0.055);
+      --olive: #567f39;
+      --olive-bright: #43682a;
+      --olive-dark: #394f29;
+      --blue: #0284c7;
+      --orange: #ea580c;
+      --text: #121810;
+      --text-secondary: #3e4c38;
+      --muted: #5c6b55;
+      --code-bg: #141a12;
+      --code-text: #d9f99d;
+      --shadow-card: 0 12px 30px rgba(18, 24, 16, 0.08);
+      --shadow-glow: 0 0 0 1px rgba(86, 127, 57, 0.25), 0 18px 42px rgba(86, 127, 57, 0.1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background:
-        radial-gradient(circle at 85% 0%, rgba(111, 156, 78, 0.16), transparent 36%),
-        radial-gradient(circle at 12% 12%, rgba(0, 158, 235, 0.12), transparent 34%),
-        var(--bg);
+      overflow-x: hidden;
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      background-image:
+        linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px),
+        radial-gradient(ellipse 65% 45% at 80% 0%, rgba(111, 156, 78, 0.16), transparent 60%),
+        radial-gradient(ellipse 55% 40% at 15% 5%, rgba(0, 158, 235, 0.12), transparent 60%);
+      background-size: 48px 48px, 48px 48px, 100% 100%, 100% 100%;
       color: var(--text);
-      line-height: 1.65;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 0.25s ease, color 0.25s ease;
     }
+
     a { color: var(--blue); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .container { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+    button { font-family: inherit; }
 
-    /* Header ala Overthinker Studio App Topbar */
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Sticky Glass Header */
     header {
-      position: sticky; top: 0; z-index: 40;
-      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       background: var(--bg-bar);
       border-bottom: 1px solid var(--border);
     }
+
     .studio-header {
-      display: flex; align-items: center; justify-content: space-between;
-      min-height: 64px; gap: 16px; flex-wrap: wrap; padding: 8px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 68px;
+      gap: 16px;
     }
-    .brand { display: flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text);
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .brand:hover { text-decoration: none; }
+
     .brand-icon {
-      width: 38px; height: 38px; border-radius: 10px; padding: 5px;
-      background: var(--surface-2); border: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      padding: 6px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
-    .brand-icon img { width: 100%; height: 100%; }
-    .brand-title { font-weight: 800; font-size: 17px; line-height: 1.1; }
+    .brand-icon img { width: 100%; height: 100%; display: block; }
+    .brand-title { font-weight: 800; font-size: 17px; letter-spacing: -0.02em; line-height: 1.1; }
     .brand-sub { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); }
+
     .nav-pill {
-      display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; padding: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 4px;
     }
     .nav-pill a {
-      color: var(--muted); font-size: 12.5px; font-weight: 600;
-      padding: 6px 12px; border-radius: 8px; transition: background 0.15s, color 0.15s;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 13px;
+      border-radius: var(--radius-sm);
+      transition: background 0.18s ease, color 0.18s ease;
     }
-    .nav-pill a:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
-    .header-right { display: flex; align-items: center; gap: 10px; }
+    .nav-pill a:hover {
+      background: var(--surface-2);
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
     .status-chip {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 6px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
-      background: rgba(111, 156, 78, 0.14); border: 1px solid rgba(111, 156, 78, 0.35);
-      color: #cbe6b7;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(111, 156, 78, 0.14);
+      border: 1px solid rgba(111, 156, 78, 0.35);
+      color: var(--olive-bright);
     }
     .status-dot {
-      width: 7px; height: 7px; border-radius: 50%; background: #22c55e;
-      box-shadow: 0 0 8px #22c55e;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 10px #22c55e;
     }
-    .nav-cta {
-      padding: 8px 14px; border-radius: 10px; font-weight: 600; font-size: 12.5px;
-      background: var(--olive-dark); border: 1px solid var(--olive); color: #fff;
-    }
-    .nav-cta:hover { background: var(--olive); text-decoration: none; }
 
-    /* Scroll Reveal Animations */
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+    }
+    .icon-btn:hover {
+      border-color: var(--olive);
+      color: var(--text);
+      background: var(--surface-2);
+    }
+
+    .nav-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 38px;
+      padding: 0 15px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 13px;
+      background: linear-gradient(135deg, var(--olive-dark), var(--olive));
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      transition: transform 0.18s ease, filter 0.18s ease;
+    }
+    .nav-cta:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+      text-decoration: none;
+    }
+
+    .mobile-menu-btn { display: none; }
+    .mobile-drawer {
+      display: none;
+      border-top: 1px solid var(--border);
+      padding: 12px 0 16px;
+    }
+    .mobile-drawer.open { display: block; }
+    .mobile-drawer nav {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .mobile-drawer a {
+      display: flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .mobile-drawer a:hover { color: var(--text); text-decoration: none; }
+
+    /* Reveal Animations */
     .reveal {
       opacity: 0;
-      transform: translateY(26px);
-      transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1), transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+      transform: translateY(22px);
+      transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .reveal.is-visible {
       opacity: 1;
       transform: translateY(0);
     }
-    .delay-1 { transition-delay: 0.08s; }
-    .delay-2 { transition-delay: 0.16s; }
-    .delay-3 { transition-delay: 0.24s; }
+    .delay-1 { transition-delay: 0.06s; }
+    .delay-2 { transition-delay: 0.12s; }
+    .delay-3 { transition-delay: 0.18s; }
 
+    /* Banner Pre-release */
     .prerelease-banner {
       margin-top: 24px;
-      display: flex; align-items: flex-start; gap: 12px;
-      padding: 14px 18px; border-radius: 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 18px;
+      border-radius: var(--radius-lg);
       background: rgba(245, 158, 11, 0.1);
-      border: 1px solid rgba(245, 158, 11, 0.35);
-      font-size: 13px; color: #fde68a;
+      border: 1px solid rgba(245, 158, 11, 0.32);
+      font-size: 13px;
+      color: var(--text-secondary);
     }
-    .hero { padding: 48px 0 36px; text-align: center; }
+    .prerelease-banner strong { color: #f59e0b; }
+
+    /* Hero */
+    .hero {
+      padding: 56px 0 40px;
+      text-align: center;
+    }
     .pill {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 6px 14px; border-radius: 999px;
-      background: rgba(111, 156, 78, 0.16); border: 1px solid rgba(111, 156, 78, 0.45);
-      color: #cbe6b7; font-size: 12px; font-weight: 600; margin-bottom: 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(111, 156, 78, 0.14);
+      border: 1px solid rgba(111, 156, 78, 0.4);
+      color: var(--olive-bright);
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 18px;
     }
-    h1 { font-size: clamp(30px, 5vw, 48px); line-height: 1.15; margin: 0 0 16px; }
-    .hero p { max-width: 740px; margin: 0 auto 28px; color: var(--muted); font-size: 16px; }
-    .cta-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+    h1 {
+      font-size: clamp(32px, 5vw, 54px);
+      line-height: 1.12;
+      letter-spacing: -0.03em;
+      margin: 0 auto 18px;
+      max-width: 880px;
+    }
+    .headline-accent {
+      background: linear-gradient(120deg, var(--olive-bright), var(--blue));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero p {
+      max-width: 740px;
+      margin: 0 auto 28px;
+      color: var(--text-secondary);
+      font-size: clamp(15px, 2vw, 17px);
+    }
+    .cta-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
     .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-      padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 14px;
-      border: 1px solid var(--border); background: var(--surface); color: var(--text);
-      transition: transform 0.15s ease, border-color 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 10px 20px;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: 14px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
     }
-    .btn:hover { transform: translateY(-2px); border-color: var(--olive); text-decoration: none; }
-    .btn-win { background: linear-gradient(135deg, #009eeb, #1d4ed8); border-color: transparent; color: #fff; }
-    .btn-mac { background: linear-gradient(135deg, #394f29, #6f9c4e); border-color: transparent; color: #fff; }
-    .stack-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
-    .stack-badge {
-      font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
-      background: var(--surface); border: 1px solid var(--border); color: var(--muted);
-    }
-
-    section { padding: 44px 0; }
-    h2 { font-size: 26px; margin: 0 0 8px; }
-    .sub { color: var(--muted); font-size: 14px; margin: 0 0 24px; }
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
-    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-
-    .card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 16px; padding: 22px;
-      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-    }
-    .card:hover {
-      transform: translateY(-4px);
+    .btn:hover {
+      transform: translateY(-2px);
       border-color: var(--olive);
-      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.32);
+      text-decoration: none;
+    }
+    .btn-win {
+      background: linear-gradient(135deg, #009eeb, #1d4ed8);
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 10px 28px rgba(0, 158, 235, 0.25);
+    }
+    .btn-mac {
+      background: linear-gradient(135deg, #394f29, #6f9c4e);
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 10px 28px rgba(111, 156, 78, 0.22);
     }
 
-    /* Sejajar Download Cards */
-    .download-card {
-      display: flex; flex-direction: column; justify-content: space-between; height: 100%;
+    .stack-row {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 26px;
     }
-    .download-footer { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
-    .download-footer .btn { width: 100%; }
-
-    .card h3 { margin: 0 0 8px; font-size: 16px; color: #fff; }
-    .card p, .card li { color: var(--muted); font-size: 13.5px; }
-    .card ol, .card ul { padding-left: 18px; margin: 8px 0 0; }
-    .tag {
-      display: inline-block; font-size: 11px; font-weight: 700;
-      padding: 4px 10px; border-radius: 6px; margin-bottom: 10px;
-      background: rgba(111, 156, 78, 0.18); color: #cbe6b7; border: 1px solid rgba(111, 156, 78, 0.35);
-    }
-    code {
-      background: var(--surface-2); padding: 2px 6px; border-radius: 6px;
-      font-size: 12.5px; color: #bfe8a1;
-    }
-    pre {
-      background: #0c0f0b; border: 1px solid var(--border); border-radius: 10px;
-      padding: 12px; overflow-x: auto; font-size: 12px; color: #d9f99d;
-    }
-
-    /* Guide Cards dengan Ikon & Contoh Gambar */
-    .guide-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-    .guide-icon {
-      width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      background: rgba(111, 156, 78, 0.16); border: 1px solid rgba(111, 156, 78, 0.4);
-      color: #cbe6b7;
-    }
-    .guide-thumb {
-      margin-top: 14px; border-radius: 10px; overflow: hidden;
-      border: 1px solid var(--border); background: #0b0d12;
-    }
-    .guide-thumb img {
-      width: 100%; height: 150px; object-fit: cover; object-position: top; display: block;
-      transition: transform 0.35s ease;
-    }
-    .card:hover .guide-thumb img { transform: scale(1.03); }
-
-    /* Slider Otomatis Besar untuk Pratinjau Aplikasi */
-    .slider-wrap {
-      position: relative;
+    .stack-badge {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 5px 11px;
+      border-radius: var(--radius-sm);
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 16px;
-      box-shadow: 0 24px 54px rgba(0, 0, 0, 0.45);
+      color: var(--muted);
     }
+
+    /* Pipeline Architecture Bar */
+    .pipeline-strip {
+      margin-top: 34px;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      text-align: left;
+    }
+    .pipe-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      backdrop-filter: blur(10px);
+    }
+    .pipe-num {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--olive-bright);
+      margin-bottom: 4px;
+    }
+    .pipe-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+    .pipe-desc {
+      font-size: 11.5px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    /* Sections */
+    section { padding: 52px 0; }
+    .section-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    h2 {
+      font-size: clamp(22px, 3vw, 28px);
+      letter-spacing: -0.02em;
+      margin: 0 0 6px;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0;
+      max-width: 680px;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 18px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      backdrop-filter: blur(10px);
+      transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: var(--olive);
+      box-shadow: var(--shadow-glow);
+    }
+    .card h3 { margin: 0 0 8px; font-size: 16.5px; color: var(--text); }
+    .card p, .card li { color: var(--text-secondary); font-size: 13.5px; }
+    .card ol, .card ul { padding-left: 18px; margin: 10px 0 0; }
+    .card li + li { margin-top: 6px; }
+
+    .tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      background: rgba(111, 156, 78, 0.14);
+      color: var(--olive-bright);
+      border: 1px solid rgba(111, 156, 78, 0.32);
+    }
+
+    /* Download Cards */
+    .download-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+    }
+    .download-footer {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .download-footer .btn { width: 100%; }
+
+    code {
+      font-family: var(--font-mono);
+      background: var(--surface-2);
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--olive-bright);
+    }
+
+    .code-box {
+      position: relative;
+      margin-top: 12px;
+    }
+    pre {
+      margin: 0;
+      background: var(--code-bg);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      padding: 12px 72px 12px 14px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--code-text);
+    }
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.08);
+      color: #e5e7eb;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: rgba(111, 156, 78, 0.35); }
+
+    /* App Window Frame & Slider */
+    .slider-wrap {
+      background: var(--surface-solid);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-xl);
+      padding: 14px;
+      box-shadow: var(--shadow-card);
+    }
+    .window-chrome {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 4px 8px 12px;
+    }
+    .chrome-dots {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .chrome-dots span {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .chrome-dots span:nth-child(1) { background: #ef4444; }
+    .chrome-dots span:nth-child(2) { background: #f59e0b; }
+    .chrome-dots span:nth-child(3) { background: #22c55e; }
+    .chrome-label {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+
     .slider-viewport {
       position: relative;
       overflow: hidden;
-      border-radius: 12px;
+      border-radius: var(--radius-md);
       background: #090b10;
       border: 1px solid var(--border);
     }
@@ -208,164 +565,328 @@
       display: flex;
       transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
     }
-    .slider-slide {
-      min-width: 100%;
-      position: relative;
-    }
+    .slider-slide { min-width: 100%; }
     .slider-slide img {
       width: 100%;
-      max-height: 620px;
+      max-height: 600px;
       object-fit: contain;
       display: block;
       background: #090b10;
     }
     .slider-caption {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; flex-wrap: wrap;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
       padding: 14px 6px 4px;
     }
-    .slider-title { font-size: 15px; font-weight: 700; color: #fff; }
+    .slider-title { font-size: 15px; font-weight: 700; color: var(--text); }
     .slider-desc { font-size: 13px; color: var(--muted); }
     .slider-controls { display: flex; align-items: center; gap: 8px; }
     .slider-btn {
-      width: 36px; height: 36px; border-radius: 10px; cursor: pointer;
-      background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
-      font-size: 16px; font-weight: 700;
-      display: inline-flex; align-items: center; justify-content: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      cursor: pointer;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.15s ease, background 0.15s ease;
     }
-    .slider-btn:hover { border-color: var(--olive); background: var(--olive-dark); }
-    .slider-dots { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 10px; }
+    .slider-btn:hover { border-color: var(--olive); background: var(--olive-dark); color: #fff; }
+    .slider-dots {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      margin-top: 10px;
+    }
     .slider-dot {
-      width: 10px; height: 10px; border-radius: 999px; border: none; cursor: pointer;
-      background: var(--border); transition: width 0.25s ease, background 0.25s ease;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: var(--border-strong);
+      transition: width 0.25s ease, background 0.25s ease;
     }
     .slider-dot.active { width: 28px; background: var(--olive); }
 
+    /* Guide Cards */
+    .guide-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .guide-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(111, 156, 78, 0.14);
+      border: 1px solid rgba(111, 156, 78, 0.36);
+      color: var(--olive-bright);
+    }
+    .guide-thumb {
+      margin-top: 14px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #0b0d12;
+    }
+    .guide-thumb img {
+      width: 100%;
+      height: 156px;
+      object-fit: cover;
+      object-position: top;
+      display: block;
+      transition: transform 0.35s ease;
+    }
+    .card:hover .guide-thumb img { transform: scale(1.03); }
+
     footer {
-      border-top: 1px solid var(--border); padding: 32px 0 48px;
-      color: var(--muted); font-size: 13px; text-align: center;
+      border-top: 1px solid var(--border);
+      padding: 32px 0 48px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .footer-links {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    /* Responsive Breakpoints */
+    @media (max-width: 960px) {
+      .nav-pill, .status-chip { display: none; }
+      .mobile-menu-btn { display: inline-flex; }
+      .pipeline-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 0 16px; }
+      .nav-cta { display: none; }
+      .pipeline-strip { grid-template-columns: 1fr; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .cta-row .btn { width: 100%; }
     }
   </style>
 </head>
 <body>
   <header>
-    <div class="container studio-header">
-      <a class="brand" href="#top">
-        <div class="brand-icon"><img src="assets/icon.svg" alt="Ngegame" /></div>
-        <div>
-          <div class="brand-title"><span style="color:var(--blue)">Nge</span><span style="color:var(--orange)">game</span></div>
-          <div class="brand-sub">Overthinker Studio</div>
+    <div class="container">
+      <div class="studio-header">
+        <a class="brand" href="#top">
+          <div class="brand-icon"><img src="assets/icon.svg" alt="Logo Ngegame" /></div>
+          <div>
+            <div class="brand-title"><span style="color:var(--blue)">Nge</span><span style="color:var(--orange)">game</span></div>
+            <div class="brand-sub">Overthinker Studio</div>
+          </div>
+        </a>
+
+        <nav class="nav-pill" aria-label="Navigasi utama">
+          <a href="#tentang">Tentang</a>
+          <a href="#unduhan">Download</a>
+          <a href="#pratinjau">Tampilan</a>
+          <a href="#panduan">Panduan</a>
+          <a href="#dukungan">Dukungan</a>
+        </nav>
+
+        <div class="header-right">
+          <span class="status-chip"><span class="status-dot"></span> Pre-Release v0.1.0</span>
+          <button
+            type="button"
+            class="icon-btn"
+            id="themeToggle"
+            aria-label="Ubah tema gelap atau terang"
+            title="Ubah tema"
+          >
+            <svg id="themeIconSun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <svg id="themeIconMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          </button>
+          <a class="nav-cta" href="#unduhan">Unduh Installer</a>
+          <button
+            type="button"
+            class="icon-btn mobile-menu-btn"
+            id="mobileMenuBtn"
+            aria-label="Buka menu navigasi"
+            aria-expanded="false"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+          </button>
         </div>
-      </a>
+      </div>
 
-      <nav class="nav-pill">
-        <a href="#tentang">Tentang</a>
-        <a href="#unduhan">Download</a>
-        <a href="#panduan">Panduan</a>
-        <a href="#pratinjau">Tampilan</a>
-        <a href="#dukungan">Dukungan</a>
-      </nav>
-
-      <div class="header-right">
-        <span class="status-chip"><span class="status-dot"></span> Pre-Release v0.1.0</span>
-        <a class="nav-cta" href="#unduhan">Unduh Installer</a>
+      <div class="mobile-drawer" id="mobileDrawer">
+        <nav aria-label="Navigasi seluler">
+          <a href="#tentang">Tentang Ngegame</a>
+          <a href="#unduhan">Download Installer</a>
+          <a href="#pratinjau">Tampilan Aplikasi</a>
+          <a href="#panduan">Panduan Konfigurasi</a>
+          <a href="#dukungan">Dukungan &amp; GitHub</a>
+        </nav>
       </div>
     </div>
   </header>
 
   <main id="top" class="container">
     <div class="prerelease-banner reveal">
-      <strong>Status Tahap Pre-Release (v0.1.0):</strong>
-      <span>
-        Aplikasi ini masih berada pada tahap pengembangan awal (<em>Public Testing Pre-release</em>). Fitur inti sudah aktif dan dapat diuji, namun beberapa modul dan kompatibilitas perangkat Windows/macOS terus disempurnakan.
-      </span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" style="flex-shrink:0;margin-top:2px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      <div>
+        <strong>Tahap Pre-Release (v0.1.0):</strong>
+        <span>Aplikasi berada pada fase <em>Public Testing</em>. Fitur inti dapat diuji di Windows &amp; macOS sembari peningkatan kompatibilitas terus dilakukan.</span>
+      </div>
     </div>
 
     <section class="hero reveal">
       <div class="pill">Overthinker Studio &bull; Desktop AI Gaming &amp; Streaming Center</div>
-      <h1>Kendali AI Gaming, Visi Layar &amp; Studio Siaran dalam Satu Aplikasi</h1>
+      <h1>
+        Kendali AI Gaming, <span class="headline-accent">Visi Layar &amp; Studio Siaran</span> dalam Satu Aplikasi
+      </h1>
       <p>
-        <strong>Ngegame</strong> (<em>Overthinker-Ngegame</em>) adalah aplikasi desktop lintas platform untuk gamer dan kreator konten yang menggabungkan pemindaian pustaka Steam, pengamatan layar game real-time, penalaran AI dengan pengawasan manusia <strong>L1/L2/L3</strong>, narator suara <strong>VoxCPM 2.0</strong> Bahasa Indonesia, serta kendali <strong>OBS Studio WebSocket v5</strong>.
+        <strong>Ngegame</strong> (<em>Overthinker-Ngegame</em>) adalah pusat kendali desktop lintas platform yang memadukan pemindaian pustaka Steam, pengamatan layar game real-time, penalaran AI dengan pengawasan manusia <strong>L1/L2/L3</strong>, narator suara <strong>VoxCPM 2.0</strong> Bahasa Indonesia, dan otomasi <strong>OBS Studio WebSocket v5</strong>.
       </p>
       <div class="cta-row">
-        <a class="btn btn-win" href="#unduhan">Menu Download Installer</a>
-        <a class="btn btn-mac" href="#panduan">Baca Panduan Setup</a>
+        <a class="btn btn-win" href="#unduhan">Download Installer</a>
+        <a class="btn btn-mac" href="#panduan">Panduan Setup</a>
         <a class="btn" data-repo-link="" href="#">Repositori GitHub</a>
       </div>
+
       <div class="stack-row">
         <span class="stack-badge">Electron 35</span>
-        <span class="stack-badge">React 19</span>
-        <span class="stack-badge">TypeScript</span>
+        <span class="stack-badge">React 19 + TS</span>
         <span class="stack-badge">Node.js 22</span>
-        <span class="stack-badge">Python 3.11</span>
+        <span class="stack-badge">Python 3 Worker</span>
         <span class="stack-badge">SQLite + Prisma</span>
+        <span class="stack-badge">OBS WebSocket v5</span>
+      </div>
+
+      <div class="pipeline-strip" aria-label="Alur pipeline kendali AI">
+        <div class="pipe-step">
+          <div class="pipe-num">01. OBSERVE</div>
+          <div class="pipe-title">Vision Capture</div>
+          <div class="pipe-desc">Deteksi jendela game &amp; tangkap frame layar secara aman.</div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-num">02. REASON</div>
+          <div class="pipe-title">AI Brain</div>
+          <div class="pipe-desc">Analisis multimodal via Ollama lokal atau OpenAI API.</div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-num">03. GUARD</div>
+          <div class="pipe-title">Supervisi L1–L3</div>
+          <div class="pipe-desc">Antrean persetujuan manusia, Takeover &amp; Emergency Stop.</div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-num">04. ACT</div>
+          <div class="pipe-title">Native Input</div>
+          <div class="pipe-desc">Win32 SendInput Scancode &amp; macOS Quartz CGEvent.</div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-num">05. STREAM</div>
+          <div class="pipe-title">OBS &amp; VoxCPM</div>
+          <div class="pipe-desc">Komentar Bahasa Indonesia &amp; kontrol adegan siaran otomatis.</div>
+        </div>
       </div>
     </section>
 
     <section id="tentang" class="reveal">
-      <h2>Apa Itu Ngegame?</h2>
-      <p class="sub">Dirancang oleh Overthinker Studio agar AI dapat mengamati game, membantu aksi secara aman, dan mengomentari permainan saat live streaming.</p>
+      <div class="section-head">
+        <div>
+          <h2>Arsitektur &amp; Kemampuan Inti</h2>
+          <p class="sub">Dirancang modular agar AI dapat mengamati permainan, membantu aksi dengan aman, dan mengelola siaran live Anda.</p>
+        </div>
+      </div>
       <div class="grid-3">
-        <div class="card reveal delay-1">
-          <div class="tag">01 &bull; Pustaka &amp; Adaptor</div>
+        <article class="card reveal delay-1">
+          <div class="tag">01 &bull; PUSTAKA &amp; ADAPTOR</div>
           <h3>Deteksi Steam &amp; Profil Game</h3>
-          <p>Memindai game Steam lokal secara otomatis dan menerapkan profil strategi/kontroler aman (<em>allowlist</em>) per genre tanpa meminta kata sandi Steam Anda.</p>
-        </div>
-        <div class="card reveal delay-2">
-          <div class="tag">02 &bull; AI &amp; Pengawasan Manusia</div>
+          <p>Memindai library Steam lokal (<code>appmanifest_*.acf</code>) tanpa meminta login Steam dan menerapkan profil kontroler aman berbasis <em>allowlist</em> per genre.</p>
+        </article>
+        <article class="card reveal delay-2">
+          <div class="tag">02 &bull; AI &amp; PENGAWASAN</div>
           <h3>Kendali Bertingkat L1 / L2 / L3</h3>
-          <p>AI membaca layar melalui Python Vision Worker (Ollama lokal atau Cloud LLM) dengan kontrol manusia penuh: <strong>L2 Wajib Persetujuan</strong>, <strong>Takeover</strong>, dan <strong>Emergency Stop</strong> instan.</p>
-        </div>
-        <div class="card reveal delay-3">
-          <div class="tag">03 &bull; Studio Suara &amp; Siaran</div>
+          <p>AI Brain membaca kondisi gameplay melalui Python Vision Worker dengan kontrol manusia penuh: <strong>L2 Wajib Persetujuan</strong>, <strong>Ambil Alih Kontrol</strong>, dan <strong>Emergency Stop</strong> instan.</p>
+        </article>
+        <article class="card reveal delay-3">
+          <div class="tag">03 &bull; STUDIO SUARA &amp; SIARAN</div>
           <h3>OBS WebSocket &amp; VoxCPM 2.0</h3>
-          <p>Menghubungkan OBS Studio untuk kontrol adegan dan pratinjau output, menyimpan Stream Key YouTube/Twitch di OS Keychain/Credential Manager, serta komentar suara Bahasa Indonesia.</p>
-        </div>
+          <p>Mengendalikan adegan OBS Studio, menyimpan Stream Key YouTube/Twitch secara terenkripsi di OS Keychain/Credential Manager, serta komentar suara Bahasa Indonesia.</p>
+        </article>
       </div>
     </section>
 
     <section id="unduhan" class="reveal">
-      <h2>Download Installer (Pre-Release v0.1.0)</h2>
-      <p class="sub">Pilih paket sesuai sistem operasi Anda. Seluruh berkas rilis resmi tersedia di halaman GitHub Releases.</p>
+      <div class="section-head">
+        <div>
+          <h2>Download Installer (Pre-Release v0.1.0)</h2>
+          <p class="sub">Pilih paket sesuai sistem operasi Anda. Seluruh berkas rilis resmi dan catatan versi tersedia di GitHub Releases.</p>
+        </div>
+      </div>
       <div class="grid-2">
-        <div class="card download-card reveal delay-1">
+        <article class="card download-card reveal delay-1">
           <div>
-            <div class="tag">Windows 10 / 11 (x64)</div>
+            <div class="tag">WINDOWS 10 / 11 (X64)</div>
             <h3>Windows Installer (.exe NSIS)</h3>
-            <p>Paket instalasi lengkap berisi aplikasi Electron, backend Node.js, dan database SQLite lokal.</p>
+            <p>Paket instalasi lengkap berisi aplikasi Electron, backend Node.js, Python Worker, dan database SQLite lokal di <code>userData</code>.</p>
             <ul>
               <li>Berkas: <code>Overthinker-Ngegame-Setup-0.1.0-x64.exe</code></li>
-              <li>Verifikasi checksum melalui <code>SHA256SUMS.txt</code> di PowerShell:</li>
+              <li>Verifikasi integritas melalui <code>SHA256SUMS.txt</code> di PowerShell:</li>
             </ul>
-            <pre>Get-FileHash .\Overthinker-Ngegame-Setup-0.1.0-x64.exe -Algorithm SHA256</pre>
+            <div class="code-box">
+              <pre id="shaCmd">Get-FileHash .\Overthinker-Ngegame-Setup-0.1.0-x64.exe -Algorithm SHA256</pre>
+              <button type="button" class="copy-btn" id="copyShaBtn">Salin</button>
+            </div>
           </div>
           <div class="download-footer">
             <a class="btn btn-win" data-repo-link="/releases" href="#">Unduh untuk Windows &rarr;</a>
           </div>
-        </div>
+        </article>
 
-        <div class="card download-card reveal delay-2">
+        <article class="card download-card reveal delay-2">
           <div>
-            <div class="tag">macOS Apple Silicon (arm64)</div>
+            <div class="tag">MACOS APPLE SILICON (ARM64)</div>
             <h3>macOS Installer (.dmg / .zip)</h3>
-            <p>Berjalan native di Mac M1/M2/M3/M4. Bila dibuka pertama kali tanpa sertifikat Apple Developer, klik kanan aplikasi &rarr; pilih <strong>Open</strong>.</p>
+            <p>Berjalan native di Mac M1/M2/M3/M4. Jika dibuka pertama kali tanpa sertifikat Apple Developer, klik kanan aplikasi &rarr; pilih <strong>Open</strong>.</p>
             <ul>
               <li>Berkas: <code>Overthinker-Ngegame-0.1.0-arm64.dmg</code> atau <code>.zip</code></li>
-              <li>Pastikan izin <em>Screen Recording</em> &amp; <em>Accessibility</em> diaktifkan.</li>
+              <li>Aktifkan izin <strong>Screen Recording</strong>, <strong>Accessibility</strong>, dan <strong>Input Monitoring</strong> di System Settings.</li>
             </ul>
           </div>
           <div class="download-footer">
             <a class="btn btn-mac" data-repo-link="/releases" href="#">Unduh untuk macOS &rarr;</a>
           </div>
-        </div>
+        </article>
       </div>
     </section>
 
     <section id="pratinjau" class="reveal">
-      <h2>Pratinjau Aplikasi</h2>
-      <p class="sub">Tampilan langsung antarmuka Overthinker Studio dalam ukuran penuh (otomatis berganti setiap 4,5 detik).</p>
+      <div class="section-head">
+        <div>
+          <h2>Pratinjau Antarmuka Aplikasi</h2>
+          <p class="sub">Tampilan langsung antarmuka Overthinker Studio dalam ukuran penuh (otomatis berganti setiap 4,5 detik).</p>
+        </div>
+      </div>
 
       <div class="slider-wrap" id="previewSlider">
+        <div class="window-chrome">
+          <div class="chrome-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="chrome-label" id="chromeLabel">Overthinker-Ngegame — Dasbor Operasional</div>
+          <div class="chrome-label">v0.1.0</div>
+        </div>
+
         <div class="slider-viewport">
           <div class="slider-track" id="sliderTrack">
             <div class="slider-slide">
@@ -399,8 +920,13 @@
     </section>
 
     <section id="panduan" class="reveal">
-      <h2>Panduan Konfigurasi Lengkap</h2>
-      <p class="sub">Ikuti panduan bergambar di bawah ini bila aplikasi menampilkan pesan perlu konfigurasi OBS, kunci siaran, Steam, atau izin macOS.</p>
+      <div class="section-head">
+        <div>
+          <h2>Panduan Konfigurasi Lengkap</h2>
+          <p class="sub">Langkah ringkas untuk menghubungkan OBS Studio, izin macOS, Steam, AI Brain, dan Voice Studio.</p>
+        </div>
+      </div>
+
       <div class="grid-2">
         <article class="card reveal delay-1" id="panduan-obs">
           <div class="guide-head">
@@ -412,7 +938,7 @@
           <ol>
             <li>Buka <strong>OBS Studio 28+</strong> &rarr; <code>Tools &rarr; WebSocket Server Settings</code> &rarr; centang <strong>Enable WebSocket server</strong> pada port <code>4455</code>.</li>
             <li>Di menu <strong>Studio Siaran</strong> pada Ngegame, klik <strong>Hubungkan OBS WebSocket</strong>.</li>
-            <li>Salin Stream Key dari <strong>YouTube Studio</strong> atau <strong>Twitch Creator Dashboard</strong> ke <strong>Manajer Kredensial</strong> sebelum menekan <strong>Mulai Siaran</strong>.</li>
+            <li>Simpan Stream Key YouTube atau Twitch ke <strong>Manajer Kredensial</strong> sebelum menekan <strong>Mulai Siaran</strong>.</li>
           </ol>
           <div class="guide-thumb">
             <img src="assets/screenshots/streaming-studio.png" alt="Contoh Tampilan Studio Siaran OBS" />
@@ -446,7 +972,7 @@
           <ol>
             <li>Pastikan <strong>Steam Client</strong> sudah terpasang di perangkat Anda.</li>
             <li>Buka menu <strong>Pustaka Game</strong> di Ngegame lalu klik <strong>Pindai Pustaka</strong>.</li>
-            <li>Ngegame hanya membaca berkas <code>appmanifest_*.acf</code> lokal tanpa meminta login Steam.</li>
+            <li>Ngegame hanya membaca berkas <code>appmanifest_*.acf</code> lokal tanpa meminta kata sandi Steam.</li>
           </ol>
         </article>
 
@@ -459,7 +985,7 @@
           </div>
           <ul>
             <li><strong>Ollama (Lokal):</strong> Jalankan layanan Ollama lokal untuk penalaran gratis di perangkat sendiri.</li>
-            <li><strong>OpenAI (Cloud):</strong> Opsi cadangan dengan kunci API pribadi.</li>
+            <li><strong>OpenAI (Cloud):</strong> Masukkan API Key langsung melalui menu <strong>Kendali AI</strong> untuk model vision cloud.</li>
             <li>Gunakan mode <strong>L2 Wajib Persetujuan</strong> untuk meninjau setiap aksi AI sebelum dijalankan.</li>
           </ul>
         </article>
@@ -472,8 +998,8 @@
             <h3>5. Studio Suara AI (VoxCPM 2.0)</h3>
           </div>
           <ul>
-            <li>Gunakan panel <strong>Sampel Cloning Suara</strong> untuk memutar 3 preset suara Bahasa Indonesia atau mengunggah audio referensi (<code>.wav</code>/<code>.mp3</code>).</li>
-            <li>Jika server VoxCPM 2.0 lokal belum aktif, aplikasi tetap aman dengan suara cadangan lokal.</li>
+            <li>Gunakan panel <strong>Sampel Cloning Suara</strong> untuk memutar preset Bahasa Indonesia atau mengunggah audio referensi (<code>.wav</code>/<code>.mp3</code>).</li>
+            <li>Seluruh sampel &amp; hasil cloning tersimpan permanen di folder <code>userData</code> lokal.</li>
           </ul>
         </article>
 
@@ -485,17 +1011,22 @@
             <h3>6. Tentang Pengembang &amp; Dukungan</h3>
           </div>
           <p>
-            <strong>Ngegame</strong> dikembangkan oleh <strong>Overthinker Studio</strong> (<code>OverthinkerID</code>). Dukungan Anda melalui Star GitHub, laporan bug, atau kontribusi kode sangat membantu pengembangan ke versi stabil <code>v1.0.0</code>.
+            <strong>Ngegame</strong> dikembangkan oleh <strong>Overthinker Studio</strong> (<code>OverthinkerID</code>). Dukungan Anda melalui Star GitHub, laporan bug, atau kontribusi kode membantu pengembangan menuju rilis stabil <code>v1.0.0</code>.
           </p>
-          <p><a data-repo-link="/issues" href="#">Laporkan Bug / Ajukan Fitur &rarr;</a></p>
+          <p style="margin-top:12px"><a class="btn" data-repo-link="/issues" href="#">Laporkan Bug / Ajukan Fitur &rarr;</a></p>
         </article>
       </div>
     </section>
   </main>
 
   <footer>
-    <div class="container">
-      Dikembangkan oleh <strong>Overthinker Studio</strong> (OverthinkerID) &bull; Ngegame v0.1.0 Pre-release
+    <div class="container footer-inner">
+      <div>Dikembangkan oleh <strong>Overthinker Studio</strong> (OverthinkerID) &bull; Ngegame v0.1.0 Pre-release</div>
+      <div class="footer-links">
+        <a data-repo-link="" href="#">GitHub</a>
+        <a data-repo-link="/releases" href="#">Releases</a>
+        <a data-repo-link="/issues" href="#">Issues</a>
+      </div>
     </div>
   </footer>
 
@@ -510,6 +1041,49 @@
         links[i].setAttribute('rel', 'noopener noreferrer');
       }
 
+      // Theme Toggle (Dark / Light)
+      var htmlEl = document.documentElement;
+      var sunIcon = document.getElementById('themeIconSun');
+      var moonIcon = document.getElementById('themeIconMoon');
+      var savedTheme = null;
+      try { savedTheme = localStorage.getItem('ngegame_site_theme'); } catch (e) {}
+      function applyTheme(theme) {
+        htmlEl.setAttribute('data-theme', theme);
+        sunIcon.style.display = theme === 'dark' ? 'block' : 'none';
+        moonIcon.style.display = theme === 'light' ? 'block' : 'none';
+        try { localStorage.setItem('ngegame_site_theme', theme); } catch (e) {}
+      }
+      applyTheme(savedTheme === 'light' ? 'light' : 'dark');
+      document.getElementById('themeToggle').addEventListener('click', function () {
+        applyTheme(htmlEl.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+      });
+
+      // Mobile Navigation Drawer
+      var mobileBtn = document.getElementById('mobileMenuBtn');
+      var mobileDrawer = document.getElementById('mobileDrawer');
+      mobileBtn.addEventListener('click', function () {
+        var isOpen = mobileDrawer.classList.toggle('open');
+        mobileBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+      var drawerLinks = mobileDrawer.querySelectorAll('a');
+      for (var m = 0; m < drawerLinks.length; m++) {
+        drawerLinks[m].addEventListener('click', function () {
+          mobileDrawer.classList.remove('open');
+          mobileBtn.setAttribute('aria-expanded', 'false');
+        });
+      }
+
+      // Copy SHA256 PowerShell Command
+      var copyBtn = document.getElementById('copyShaBtn');
+      var shaCmd = document.getElementById('shaCmd');
+      copyBtn.addEventListener('click', function () {
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(shaCmd.textContent.trim()).then(function () {
+          copyBtn.textContent = 'Tersalin';
+          setTimeout(function () { copyBtn.textContent = 'Salin'; }, 1800);
+        });
+      });
+
       // Scroll Reveal Observer
       var reveals = document.querySelectorAll('.reveal');
       if ('IntersectionObserver' in window) {
@@ -520,7 +1094,7 @@
               io.unobserve(entry.target);
             }
           });
-        }, { threshold: 0.12 });
+        }, { threshold: 0.1 });
         reveals.forEach(function (el) { io.observe(el); });
       } else {
         reveals.forEach(function (el) { el.classList.add('is-visible'); });
@@ -528,14 +1102,15 @@
 
       // Auto Slider Pratinjau
       var slides = [
-        { title: 'Dasbor Operasional — Mode Gelap', desc: 'Telemetri CPU/RAM/GPU real-time, status AI, OBS, dan log worker.' },
-        { title: 'Dasbor Operasional — Mode Terang', desc: 'Tampilan kontras tinggi untuk penggunaan siang hari dengan tata letak identik.' },
-        { title: 'Kendali AI & Pengawasan Manusia (L1/L2/L3)', desc: 'Antrean persetujuan aksi, pengambilalihan kontrol manusia, dan Emergency Stop.' },
-        { title: 'Studio Siaran OBS & Multistream', desc: 'Kontrol OBS WebSocket v5, pratinjau adegan, dan manajemen kunci YouTube & Twitch.' }
+        { title: 'Dasbor Operasional — Mode Gelap', desc: 'Telemetri CPU/RAM/GPU real-time, status AI, OBS, dan log worker.', chrome: 'Overthinker-Ngegame — Dasbor Operasional (Dark)' },
+        { title: 'Dasbor Operasional — Mode Terang', desc: 'Tampilan kontras tinggi untuk penggunaan siang hari dengan tata letak identik.', chrome: 'Overthinker-Ngegame — Dasbor Operasional (Light)' },
+        { title: 'Kendali AI & Pengawasan Manusia (L1/L2/L3)', desc: 'Antrean persetujuan aksi, pengambilalihan kontrol manusia, dan Emergency Stop.', chrome: 'Overthinker-Ngegame — Pusat Kendali AI' },
+        { title: 'Studio Siaran OBS & Multistream', desc: 'Kontrol OBS WebSocket v5, pratinjau adegan, dan manajemen kunci YouTube & Twitch.', chrome: 'Overthinker-Ngegame — Studio Siaran OBS' }
       ];
       var track = document.getElementById('sliderTrack');
       var titleEl = document.getElementById('sliderTitle');
       var descEl = document.getElementById('sliderDesc');
+      var chromeEl = document.getElementById('chromeLabel');
       var dotsWrap = document.getElementById('sliderDots');
       var wrap = document.getElementById('previewSlider');
       var idx = 0;
@@ -546,6 +1121,7 @@
         track.style.transform = 'translateX(-' + (idx * 100) + '%)';
         titleEl.textContent = slides[idx].title;
         descEl.textContent = slides[idx].desc;
+        chromeEl.textContent = slides[idx].chrome;
         var dots = dotsWrap.querySelectorAll('.slider-dot');
         for (var d = 0; d < dots.length; d++) {
           dots[d].classList.toggle('active', d === idx);
